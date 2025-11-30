@@ -32,6 +32,7 @@ getgenv().esplib = {
         enabled = true,
         color = Color3.new(1, 1, 1),
         thickness = 2,
+        head = Color3.new(1, 0, 0),
     },
 }
 

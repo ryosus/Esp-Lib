@@ -277,14 +277,12 @@ function espfunctions.add_skeleton(instance)
         table.insert(lines, line)
     end
 
-    if esplib.skeleton.head then
-        local head_circle = Drawing.new("Circle")
-        head_circle.Thickness = esplib.skeleton.thickness or 2
-        head_circle.Transparency = 1
-        head_circle.Visible = false
-        table.insert(bones, 1, {"Head","Head"}) -- dummy bone for head
-        table.insert(lines, 1, head_circle)
-    end
+    -- head circle
+    local head_circle = Drawing.new("Circle")
+    head_circle.Thickness = esplib.skeleton.thickness or 2
+    head_circle.Filled = false
+    head_circle.Transparency = 1
+    head_circle.Visible = false
 
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].skeleton = {
@@ -327,6 +325,9 @@ function espfunctions.remove_esp(instance)
     if data.skeleton then
         for _, line in ipairs(data.skeleton.lines) do
             line:Remove()
+        end
+        if data.skeleton.head_circle then
+            data.skeleton.head_circle:Remove()
         end
     end
 
@@ -622,30 +623,28 @@ run_service.RenderStepped:Connect(function()
                         line.Visible = false
                     end
                 end
-                if esplib.skeleton.head and sk.head_circle then
-                    local headPart = instance:FindFirstChild("Head")
-                    if headPart and headPart:IsA("BasePart") then
-                        local hpos, hVis = camera:WorldToViewportPoint(headPart.Position)
-                        if hVis then
-                            sk.head_circle.Position = Vector2.new(hpos.X, hpos.Y)
-                            sk.head_circle.Radius = (headPart.Size.X + headPart.Size.Z) / 4
-                            sk.head_circle.Color = esplib.skeleton.head
-                            sk.head_circle.Thickness = esplib.skeleton.thickness or sk.head_circle.Thickness
-                            sk.head_circle.Visible = true
-                        else
-                            sk.head_circle.Visible = false
-                        end
+
+                -- head circle
+                local head_circle = sk.head_circle
+                local head = instance:FindFirstChild("Head")
+                if head then
+                    local pos, visible = camera:WorldToViewportPoint(head.Position)
+                    if visible then
+                        head_circle.Position = pos
+                        head_circle.Radius = esplib.skeleton.thickness * 2
+                        head_circle.Color = esplib.skeleton.color
+                        head_circle.Visible = true
                     else
-                        sk.head_circle.Visible = false
+                        head_circle.Visible = false
                     end
+                else
+                    head_circle.Visible = false
                 end
             else
                 for _, line in ipairs(data.skeleton.lines) do
                     line.Visible = false
                 end
-                if data.skeleton.head_circle then
-                    data.skeleton.head_circle.Visible = false
-                end
+                data.skeleton.head_circle.Visible = false
             end
         end
     end -- end RenderStepped
