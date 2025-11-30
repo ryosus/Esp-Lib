@@ -234,6 +234,45 @@ function espfunctions.add_tracer(instance)
     }
 end
 
+function espfunctions.remove_esp(instance)
+    if not instance or not espinstances[instance] then return end
+    local data = espinstances[instance]
+
+    if data.box then
+        data.box.outline:Remove()
+        data.box.fill:Remove()
+        for _, line in ipairs(data.box.corner_fill) do
+            line:Remove()
+        end
+        for _, line in ipairs(data.box.corner_outline) do
+            line:Remove()
+        end
+    end
+    if data.healthbar then
+        data.healthbar.outline:Remove()
+        data.healthbar.fill:Remove()
+    end
+    if data.name then
+        data.name:Remove()
+    end
+    if data.distance then
+        data.distance:Remove()
+    end
+    if data.tracer then
+        data.tracer.outline:Remove()
+        data.tracer.fill:Remove()
+    end
+
+    espinstances[instance] = nil
+end
+
+function espfunctions.unload()
+    for instance, _ in pairs(espinstances) do
+        espfunctions.remove_esp(instance)
+    end
+    espinstances = {}
+end
+
 -- // main thread
 run_service.RenderStepped:Connect(function()
     for instance, data in pairs(espinstances) do
