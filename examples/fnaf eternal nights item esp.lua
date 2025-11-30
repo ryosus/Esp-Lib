@@ -26,3 +26,12 @@ workspace.ChildAdded:Connect(function(child)
         esplib.add_distance(child)
     end
 end)
+
+-- check if items are being picked up and remove esp
+game:GetService("RunService").Stepped:Connect(function()
+    for i, v in pairs(esplib.get_esp_instances()) do
+        if i.Parent ~= workspace then
+            esplib.remove_esp(i)
+        end
+    end
+end)
