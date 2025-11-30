@@ -44,7 +44,8 @@ if not esplib then
     getgenv().esplib = esplib
 end
 
-local espinstances = {}
+getgenv().espinstances = getgenv().espinstances or {}
+local espinstances = getgenv().espinstances
 local espfunctions = {}
 
 -- // services
