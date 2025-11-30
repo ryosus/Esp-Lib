@@ -617,10 +617,9 @@ run_service.RenderStepped:Connect(function()
                 end
             end
         end
-    esplib[k] = v
+    end -- end RenderStepped
 end)
-
-return esplib
+-- attach functions to esplib and return
 for k, v in pairs(espfunctions) do
     esplib[k] = v
 end

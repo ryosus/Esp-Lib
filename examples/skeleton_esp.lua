@@ -35,7 +35,7 @@ getgenv().esplib = {
     },
 }
 
-local esplib = loadstring(game:HttpGet('https://raw.githubusercontent.com/tulontop/esp-lib.lua/refs/heads/main/source.lua'))()
+local esplib = loadstring(game:HttpGet('https://raw.githubusercontent.com/ryosus/Esp-Lib/refs/heads/main/esp_lib.lua'))()
 
 for _, plr in ipairs(game.Players:GetPlayers()) do
     if plr ~= game.Players.LocalPlayer then
