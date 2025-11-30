@@ -627,17 +627,24 @@ run_service.RenderStepped:Connect(function()
                 -- head circle
                 local head_circle = sk.head_circle
                 local head = instance:FindFirstChild("Head")
-                if head then
-                    local pos, visible = camera:WorldToViewportPoint(head.Position)
-                    if visible then
-                        head_circle.Position = pos
-                        head_circle.Radius = esplib.skeleton.thickness * 2
-                        head_circle.Color = esplib.skeleton.color
+                if head and head:IsA("BasePart") then
+                    local center3, centerVis = camera:WorldToViewportPoint(head.Position)
+                    -- compute a screen-space radius by projecting a local offset on the head
+                    local offsetWorld = head.CFrame:PointToWorldSpace(Vector3.new(head.Size.X * 0.5, 0, 0))
+                    local edge3, edgeVis = camera:WorldToViewportPoint(offsetWorld)
+                    if centerVis and edgeVis then
+                        local center2 = Vector2.new(center3.X, center3.Y)
+                        local edge2 = Vector2.new(edge3.X, edge3.Y)
+                        local radius = (edge2 - center2).Magnitude
+                        head_circle.Position = center2
+                        head_circle.Radius = math.max(1, radius)
+                        head_circle.Color = esplib.skeleton.head or esplib.skeleton.color
+                        head_circle.Thickness = esplib.skeleton.thickness or head_circle.Thickness
                         head_circle.Visible = true
                     else
                         head_circle.Visible = false
                     end
-                else
+                elseif head_circle then
                     head_circle.Visible = false
                 end
             else
