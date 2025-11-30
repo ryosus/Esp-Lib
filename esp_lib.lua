@@ -202,7 +202,7 @@ function espfunctions.add_name(instance, name_text)
 
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].name = text
-    espinstances[instance].name_text = name_text
+    espinstances[instance].name_text = name_text or instance.Name
 end
 
 function espfunctions.add_distance(instance)
@@ -390,7 +390,7 @@ run_service.RenderStepped:Connect(function()
                 local center_x = (min.X + max.X) / 2
                 local y = min.Y - 15
 
-                local name_str = espinstances[instance].name_text or instance.Name
+                local name_str = espinstances[instance].name_text
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
                 if humanoid then
                     local player = players:GetPlayerFromCharacter(instance)
