@@ -40,6 +40,11 @@ if not esplib then
             outline = Color3.new(0,0,0),
             from = "mouse", -- mouse, head, top, bottom, center
         },
+        skeleton = {
+            enabled = true,
+            color = Color3.new(1, 1, 1),
+            thickness = 2,
+        },
     }
     getgenv().esplib = esplib
 end
@@ -235,6 +240,51 @@ function espfunctions.add_tracer(instance)
     }
 end
 
+function espfunctions.add_skeleton(instance)
+    if not instance or espinstances[instance] and espinstances[instance].skeleton then return end
+
+    -- common R15/R6-ish bone pairs; will only draw when both parts exist
+    local bones = {
+        {"Head","Neck"},
+        {"Neck","UpperTorso"},
+        {"UpperTorso","LowerTorso"},
+        {"LowerTorso","HumanoidRootPart"},
+
+        {"UpperTorso","LeftUpperArm"},
+        {"LeftUpperArm","LeftLowerArm"},
+        {"LeftLowerArm","LeftHand"},
+
+        {"UpperTorso","RightUpperArm"},
+        {"RightUpperArm","RightLowerArm"},
+        {"RightLowerArm","RightHand"},
+
+        {"LowerTorso","LeftUpperLeg"},
+        {"LeftUpperLeg","LeftLowerLeg"},
+        {"LeftLowerLeg","LeftFoot"},
+
+        {"LowerTorso","RightUpperLeg"},
+        {"RightUpperLeg","RightLowerLeg"},
+        {"RightLowerLeg","RightFoot"},
+    }
+
+    local lines = {}
+    for i = 1, #bones do
+        local line = Drawing.new("Line")
+        line.Thickness = esplib.skeleton.thickness or 2
+        line.Transparency = 1
+        line.Visible = false
+        table.insert(lines, line)
+    end
+
+    espinstances[instance] = espinstances[instance] or {}
+    espinstances[instance].skeleton = {
+        bones = bones,
+        lines = lines,
+    }
+end
+
+
+
 function espfunctions.remove_esp(instance)
     if not instance or not espinstances[instance] then return end
     local data = espinstances[instance]
@@ -262,6 +312,11 @@ function espfunctions.remove_esp(instance)
     if data.tracer then
         data.tracer.outline:Remove()
         data.tracer.fill:Remove()
+    end
+    if data.skeleton then
+        for _, line in ipairs(data.skeleton.lines) do
+            line:Remove()
+        end
     end
 
     espinstances[instance] = nil
@@ -301,6 +356,11 @@ run_service.RenderStepped:Connect(function()
             if data.tracer then
                 data.tracer.outline:Remove()
                 data.tracer.fill:Remove()
+            end
+            if data.skeleton then
+                for _, line in ipairs(data.skeleton.lines) do
+                    line:Remove()
+                end
             end
             espinstances[instance] = nil
             continue
@@ -525,10 +585,42 @@ run_service.RenderStepped:Connect(function()
                 data.tracer.fill.Visible = false
             end
         end
-    end
+
+        if data.skeleton then
+            if esplib.skeleton.enabled and onscreen then
+                local sk = data.skeleton
+                for i, pair in ipairs(sk.bones) do
+                    local aName, bName = pair[1], pair[2]
+                    local aPart = instance:FindFirstChild(aName)
+                    local bPart = instance:FindFirstChild(bName)
+
+                    local line = sk.lines[i]
+                    if aPart and aPart:IsA("BasePart") and bPart and bPart:IsA("BasePart") then
+                        local apos, aVis = camera:WorldToViewportPoint(aPart.Position)
+                        local bpos, bVis = camera:WorldToViewportPoint(bPart.Position)
+                        if aVis and bVis then
+                            line.From = Vector2.new(apos.X, apos.Y)
+                            line.To = Vector2.new(bpos.X, bpos.Y)
+                            line.Color = esplib.skeleton.color
+                            line.Thickness = esplib.skeleton.thickness or line.Thickness
+                            line.Visible = true
+                        else
+                            line.Visible = false
+                        end
+                    else
+                        line.Visible = false
+                    end
+                end
+            else
+                for _, line in ipairs(data.skeleton.lines) do
+                    line.Visible = false
+                end
+            end
+        end
+    esplib[k] = v
 end)
 
--- // return
+return esplib
 for k, v in pairs(espfunctions) do
     esplib[k] = v
 end
