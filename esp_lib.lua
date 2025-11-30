@@ -373,6 +373,9 @@ run_service.RenderStepped:Connect(function()
                 for _, line in ipairs(data.skeleton.lines) do
                     line:Remove()
                 end
++                if data.skeleton.head_circle then
++                    data.skeleton.head_circle:Remove()
++                end
             end
             espinstances[instance] = nil
             continue
