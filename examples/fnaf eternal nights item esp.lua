@@ -7,7 +7,7 @@ for i, v in pairs(workspace:GetChildren()) do
     esplib.add_box(v.Handle)
     esplib.add_name(v.Handle, v.Name)
     esplib.add_distance(v.Handle)
-    elseif v.Name == "Battery" or v.Name == "OldFlashlight" then
+    elseif v.Name in ["Battery", "OldFlashlight"] then
         esplib.add_box(v)
         esplib.add_name(v)
         esplib.add_distance(v)
@@ -20,7 +20,7 @@ workspace.ChildAdded:Connect(function(child)
         esplib.add_box(child.Handle)
         esplib.add_name(child.Handle, child.Name)
         esplib.add_distance(child.Handle)
-    elseif child.Name == "Battery" or child.Name == "OldFlashlight" then
+    elseif child.Name in ["Battery", "OldFlashlight"] then
         esplib.add_box(child)
         esplib.add_name(child)
         esplib.add_distance(child)

@@ -4,7 +4,7 @@
     A library for creating esp visuals in roblox using drawing.
     Provides functions to add boxes, health bars, names and distances to instances.
     Written by tul (@.lutyeh).
-    Edited by ryo (@ryosus).
+    Edited by ryo (@.ryosus).
 
 ]]
 
