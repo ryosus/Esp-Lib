@@ -492,15 +492,16 @@ run_service.RenderStepped:Connect(function()
             if esplib.dynamic_text.enabled and onscreen then
                 local number_of_texts = 0
                 for value_name, text in pairs(data.texts) do
-                    number_of_texts = number_of_texts + 1
                     local center_x = (min.X + max.X) / 2
-                    local y = min.Y + esplib.dynamic_text.y_offset * (number_of_texts)
+                    local y = min.Y - esplib.dynamic_text.y_offset - (number_of_texts * esplib.dynamic_text.y_offset)
 
                     text.Text = text
                     text.Size = esplib.dynamic_text.size
                     text.Color = esplib.dynamic_text.fill
                     text.Position = Vector2.new(center_x, y)
                     text.Visible = true
+                    
+                    number_of_texts = number_of_texts + 1
                 end
             else
                 for _, text in pairs(data.texts) do
