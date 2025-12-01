@@ -494,7 +494,7 @@ run_service.RenderStepped:Connect(function()
                 for value_name, text in pairs(data.texts) do
                     number_of_texts = number_of_texts + 1
                     local center_x = (min.X + max.X) / 2
-                    local y = min.Y + esplib.dynamic_text.y_offset * (number_of_texts - 1)
+                    local y = min.Y + esplib.dynamic_text.y_offset * (number_of_texts)
 
                     text.Text = text
                     text.Size = esplib.dynamic_text.size
