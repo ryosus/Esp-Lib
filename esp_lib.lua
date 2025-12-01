@@ -46,6 +46,10 @@ if not esplib then
             color = Color3.new(1, 1, 1),
             thickness = 2,
         },
+        minimum_health = {
+            enabled = true,
+            value = 0
+        }, -- if health is below this value, don't show anything
     }
     getgenv().esplib = esplib
 end
@@ -344,40 +348,16 @@ end
 -- // main thread
 run_service.RenderStepped:Connect(function()
     for instance, data in pairs(espinstances) do
-        if not instance or not instance.Parent then
-            if data.box then
-                data.box.outline:Remove()
-                data.box.fill:Remove()
-                for _, line in ipairs(data.box.corner_fill) do
-                    line:Remove()
-                end
-                for _, line in ipairs(data.box.corner_outline) do
-                    line:Remove()
+        if esplib.minimum_health.enabled then
+            local humanoid = instance:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                if humanoid.Health <= esplib.minimum_health.value then
+                    espfunctions.remove_esp(instance)
+                    continue
                 end
             end
-            if data.healthbar then
-                data.healthbar.outline:Remove()
-                data.healthbar.fill:Remove()
-            end
-            if data.name then
-                data.name:Remove()
-            end
-            if data.distance then
-                data.distance:Remove()
-            end
-            if data.tracer then
-                data.tracer.outline:Remove()
-                data.tracer.fill:Remove()
-            end
-            if data.skeleton then
-                for _, line in ipairs(data.skeleton.lines) do
-                    line:Remove()
-                end
-                if data.skeleton.head_circle then
-                    data.skeleton.head_circle:Remove()
-                end
-            end
-            espinstances[instance] = nil
+        elseif not instance or not instance.Parent then
+            espfunctions.remove_esp(instance)
             continue
         end
 
