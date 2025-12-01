@@ -24,6 +24,12 @@ if not esplib then
             fill = Color3.new(0,1,0),
             outline = Color3.new(0,0,0),
         },
+        dynamic_text = {
+            enabled = true,
+            fill = Color3.new(1,1,1),
+            size = 13,
+            y_offset = -15,
+        },
         name = {
             enabled = true,
             fill = Color3.new(1,1,1),
@@ -203,7 +209,7 @@ function espfunctions.add_healthbar(instance)
     }
 end
 
-function espfunctions.add_name(instance, name_text)
+function espfunctions.add_dynamic_text(instance, value_name, text)
     if not instance or espinstances[instance] and espinstances[instance].name then return end
     local text = Drawing.new("Text")
     text.Center = true
@@ -212,8 +218,12 @@ function espfunctions.add_name(instance, name_text)
     text.Transparency = 1
 
     espinstances[instance] = espinstances[instance] or {}
-    espinstances[instance].name = text
-    espinstances[instance].name_text = name_text or instance.Name
+    espinstances[instance].texts = espinstances[instance].texts or {}
+    espinstances[instance].texts[value_name] = text
+end
+
+function espfunctions.add_name(instance, name_text) -- For convenience and backward compatibility
+    espfunctions.add_dynamic_text(instance, "name", name_text)
 end
 
 function espfunctions.add_distance(instance)
@@ -296,8 +306,6 @@ function espfunctions.add_skeleton(instance)
     }
 end
 
-
-
 function espfunctions.remove_esp(instance)
     if not instance or not espinstances[instance] then return end
     local data = espinstances[instance]
@@ -316,8 +324,10 @@ function espfunctions.remove_esp(instance)
         data.healthbar.outline:Remove()
         data.healthbar.fill:Remove()
     end
-    if data.name then
-        data.name:Remove()
+    if data.texts then
+        for _, text in pairs(data.texts) do
+            text:Remove()
+        end
     end
     if data.distance then
         data.distance:Remove()
@@ -478,14 +488,35 @@ run_service.RenderStepped:Connect(function()
                 end
             end
         end
+        if data.texts then
+            if esplib.dynamic_text.enabled and onscreen then
+                local number_of_texts = 0
+                for value_name, text in pairs(data.texts) do
+                    number_of_texts = number_of_texts + 1
+                    local center_x = (min.X + max.X) / 2
+                    local y = min.Y + esplib.dynamic_text.y_offset * (number_of_texts - 1)
 
-        if data.name then
+                    text.Text = text
+                    text.Size = esplib.dynamic_text.size
+                    text.Color = esplib.dynamic_text.fill
+                    text.Position = Vector2.new(center_x, y)
+                    text.Visible = true
+                end
+            else
+                for _, text in pairs(data.texts) do
+                    text.Visible = false
+                end
+            end
+        end
+            
+        --[[
+        if data.texts and data.texts.name then
             if esplib.name.enabled and onscreen then
-                local text = data.name
+                local text = data.texts.name
                 local center_x = (min.X + max.X) / 2
                 local y = min.Y - 15
 
-                local name_str = espinstances[instance].name_text
+                local name_str = espinstances[instance].texts.name_text
                 local humanoid = instance:FindFirstChildOfClass("Humanoid")
                 if humanoid then
                     local player = players:GetPlayerFromCharacter(instance)
@@ -502,7 +533,7 @@ run_service.RenderStepped:Connect(function()
             else
                 data.name.Visible = false
             end
-        end
+        end--]]
 
         if data.distance then
             if esplib.distance.enabled and onscreen then

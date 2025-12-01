@@ -34,6 +34,10 @@ getgenv().esplib = {
         thickness = 2,
         head = Color3.new(1, 0, 0),
     },
+    minimum_health = {
+        enabled = true,
+        value = 0
+    }, -- if health is below this value, don't show anything
 }
 
 local esplib = loadstring(game:HttpGet('https://raw.githubusercontent.com/ryosus/Esp-Lib/refs/heads/main/esp_lib.lua'))()
