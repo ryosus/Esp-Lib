@@ -30,11 +30,6 @@ if not esplib then
             size = 13,
             y_offset = -15,
         },
-        name = {
-            enabled = true,
-            fill = Color3.new(1,1,1),
-            size = 13,
-        },
         distance = {
             enabled = true,
             fill = Color3.new(1,1,1),
@@ -211,20 +206,18 @@ end
 
 function espfunctions.add_dynamic_text(instance, value_name, text)
     if not instance or espinstances[instance] and espinstances[instance].name then return end
-    local text = Drawing.new("Text")
-    text.Center = true
-    text.Outline = true
-    text.Font = 1
-    text.Transparency = 1
+    local text_object = Drawing.new("Text")
+    text_object.Center = true
+    text_object.Outline = true
+    text_object.Font = 1
+    text_object.Transparency = 1
+    text_object.Text = text
 
     espinstances[instance] = espinstances[instance] or {}
     espinstances[instance].texts = espinstances[instance].texts or {}
-    espinstances[instance].texts[value_name] = text
+    espinstances[instance].texts[value_name] = text_object
 end
 
-function espfunctions.add_name(instance, name_text) -- For convenience and backward compatibility
-    espfunctions.add_dynamic_text(instance, "name", name_text)
-end
 
 function espfunctions.add_distance(instance)
     if not instance or espinstances[instance] and espinstances[instance].distance then return end
@@ -491,17 +484,16 @@ run_service.RenderStepped:Connect(function()
         if data.texts then
             if esplib.dynamic_text.enabled and onscreen then
                 local number_of_texts = 0
-                for value_name, text in pairs(data.texts) do
+                for value_name, text_object in pairs(data.texts) do
+                    number_of_texts = number_of_texts + 1
                     local center_x = (min.X + max.X) / 2
                     local y = min.Y - esplib.dynamic_text.y_offset - (number_of_texts * esplib.dynamic_text.y_offset)
-
-                    text.Text = text
-                    text.Size = esplib.dynamic_text.size
-                    text.Color = esplib.dynamic_text.fill
-                    text.Position = Vector2.new(center_x, y)
-                    text.Visible = true
                     
-                    number_of_texts = number_of_texts + 1
+                    text_object.Size = esplib.dynamic_text.size
+                    text_object.Color = esplib.dynamic_text.fill
+                    text_object.Position = Vector2.new(center_x, y)
+                    text_object.Visible = true
+                    
                 end
             else
                 for _, text in pairs(data.texts) do
@@ -510,31 +502,6 @@ run_service.RenderStepped:Connect(function()
             end
         end
             
-        --[[
-        if data.texts and data.texts.name then
-            if esplib.name.enabled and onscreen then
-                local text = data.texts.name
-                local center_x = (min.X + max.X) / 2
-                local y = min.Y - 15
-
-                local name_str = espinstances[instance].texts.name_text
-                local humanoid = instance:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    local player = players:GetPlayerFromCharacter(instance)
-                    if player then
-                        name_str = player.Name
-                    end
-                end
-
-                text.Text = name_str
-                text.Size = esplib.name.size
-                text.Color = esplib.name.fill
-                text.Position = Vector2.new(center_x, y)
-                text.Visible = true
-            else
-                data.name.Visible = false
-            end
-        end--]]
 
         if data.distance then
             if esplib.distance.enabled and onscreen then
