@@ -318,10 +318,8 @@ function espfunctions.remove_esp(instance)
         data.healthbar.fill:Remove()
     end
     if data.texts then
-        for _, obj in pairs(data.texts) do
-            for _, text in pairs(obj) do
-                text:Remove()
-            end
+        for _, text in pairs(data.texts) do
+            text:Remove()
         end
     end
     if data.distance then
