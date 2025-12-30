@@ -18,11 +18,6 @@ getgenv().esplib = {
         size = 13,
         y_offset = -15,
     },
-    name = {
-        enabled = true,
-        fill = Color3.new(1,1,1),
-        size = 13,
-    },
     distance = {
         enabled = true,
         fill = Color3.new(1,1,1),
@@ -46,12 +41,12 @@ getgenv().esplib = {
     }, -- if health is below this value, don't show anything
 }
 
+
 local esplib = loadstring(game:HttpGet('https://raw.githubusercontent.com/ryosus/Esp-Lib/refs/heads/main/esp_lib.lua'))()
 
 local function apply_esp(character)
     esplib.add_healthbar(character)
-    --esplib.add_name(character)
-    esplib.add_dynamic_text(character, "test", "hahahaha")
+    esplib.add_dynamic_text(character,"name",character.Name)
     esplib.add_distance(character)
     esplib.add_tracer(character)
     esplib.add_skeleton(character)

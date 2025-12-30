@@ -12,10 +12,11 @@ getgenv().esplib = {
         fill = Color3.new(0,1,0),
         outline = Color3.new(0,0,0),
     },
-    name = {
+    dynamic_text = {
         enabled = true,
         fill = Color3.new(1,1,1),
         size = 13,
+        y_offset = -15,
     },
     distance = {
         enabled = true,
@@ -41,10 +42,10 @@ getgenv().esplib = {
 }
 
 local esplib = loadstring(game:HttpGet('https://raw.githubusercontent.com/ryosus/Esp-Lib/refs/heads/main/esp_lib.lua'))()
-
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Exunys/Aimbot-V3/main/src/Aimbot.lua"))()()
 local function apply_esp(character)
     esplib.add_healthbar(character)
-    esplib.add_name(character)
+    esplib.add_dynamic_text(character,"name",character.Name)
     esplib.add_distance(character)
     esplib.add_tracer(character)
     esplib.add_skeleton(character)
@@ -70,6 +71,11 @@ local function main(character)
     team = checkTeam(character)
     if team ~= checkTeam(game.Players.LocalPlayer) and team ~= "Neutral" then
         apply_esp(character)
+        pcall(function()
+            ExunysDeveloperAimbot:Whitelist(character.Name)
+        end)
+    else
+        ExunysDeveloperAimbot:Blacklist(character.Name)
     end
 end
 
@@ -86,9 +92,18 @@ for i,v in pairs(game.Players:GetPlayers()) do
 end
 
 game.Players.PlayerAdded:Connect(function(v)
+    ExunysDeveloperAimbot:Blacklist(v.Name)
     if v ~= game.Players.LocalPlayer then
         v.CharacterAdded:Connect(function(character)
             main(character)
         end)
     end
 end)
+
+settings = ExunysDeveloperAimbot.Settings
+settings.Enabled = true
+settings.LockMode = 2
+settings.Sensitivity2 = 1
+ExunysDeveloperAimbot.RainbowOutlineColor = true
+ExunysDeveloperAimbot.RainbowColor = true
+settings.AliveCheck = true
