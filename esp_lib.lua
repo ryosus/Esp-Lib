@@ -2,142 +2,298 @@
 
     esp-lib.lua
     A library for creating esp visuals in roblox using drawing.
-    Provides functions to add boxes, health bars, names and distances to instances.
+    Provides functions to add boxes, health bars, names, distances, tracers,
+    skeletons and head dots to instances.
+
     Written by tul (@.lutyeh).
     Edited by ryo (@.ryosus).
 
+    Every option lives in `getgenv().esplib` and is read live every frame, so a
+    user interface (see esp_gui.lua) can mutate it without reloading the library.
+
 ]]
-
--- // table
-local esplib = getgenv().esplib
-if not esplib then
-    esplib = {
-        box = {
-            enabled = true,
-            type = "normal", -- normal, corner
-            padding = 1.15,
-            fill = Color3.new(1,1,1),
-            outline = Color3.new(0,0,0),
-        },
-        healthbar = {
-            enabled = true,
-            fill = Color3.new(0,1,0),
-            outline = Color3.new(0,0,0),
-        },
-        dynamic_text = {
-            enabled = true,
-            fill = Color3.new(1,1,1),
-            size = 13,
-            y_offset = -15,
-        },
-        distance = {
-            enabled = true,
-            fill = Color3.new(1,1,1),
-            size = 13,
-        },
-        tracer = {
-            enabled = true,
-            fill = Color3.new(1,1,1),
-            outline = Color3.new(0,0,0),
-            from = "mouse", -- mouse, head, top, bottom, center
-        },
-        skeleton = {
-            enabled = true,
-            head = Color3.new(1, 0, 0),
-            color = Color3.new(1, 1, 1),
-            thickness = 2,
-        },
-        minimum_health = {
-            enabled = true,
-            value = 0
-        }, -- if health is below this value, don't show anything
-    }
-    getgenv().esplib = esplib
-end
-
-getgenv().espinstances = getgenv().espinstances or {}
-local espinstances = getgenv().espinstances
-local espfunctions = {}
 
 -- // services
 local run_service = game:GetService("RunService")
 local players = game:GetService("Players")
 local user_input_service = game:GetService("UserInputService")
-local camera = workspace.CurrentCamera
+local local_player = players.LocalPlayer
 
--- // functions
-local function get_bounding_box(instance)
-    local min, max = Vector2.new(math.huge, math.huge), Vector2.new(-math.huge, -math.huge)
-    local onscreen = false
+-- // defaults
+local defaults = {
+    enabled = true, -- master switch
 
-    if instance:IsA("Model") then
-        for _, p in ipairs(instance:GetChildren()) do
-            if p:IsA("BasePart") then
-                local size = (p.Size / 2) * esplib.box.padding
-                local cf = p.CFrame
-                for _, offset in ipairs({
-                    Vector3.new( size.X,  size.Y,  size.Z),
-                    Vector3.new(-size.X,  size.Y,  size.Z),
-                    Vector3.new( size.X, -size.Y,  size.Z),
-                    Vector3.new(-size.X, -size.Y,  size.Z),
-                    Vector3.new( size.X,  size.Y, -size.Z),
-                    Vector3.new(-size.X,  size.Y, -size.Z),
-                    Vector3.new( size.X, -size.Y, -size.Z),
-                    Vector3.new(-size.X, -size.Y, -size.Z),
-                }) do
-                    local pos, visible = camera:WorldToViewportPoint(cf:PointToWorldSpace(offset))
-                    if visible then
-                        local v2 = Vector2.new(pos.X, pos.Y)
-                        min = min:Min(v2)
-                        max = max:Max(v2)
-                        onscreen = true
-                    end
-                end
-            elseif p:IsA("Accessory") then
-                local handle = p:FindFirstChild("Handle")
-                if handle and handle:IsA("BasePart") then
-                    local size = (handle.Size / 2) * esplib.box.padding
-                    local cf = handle.CFrame
-                    for _, offset in ipairs({
-                        Vector3.new( size.X,  size.Y,  size.Z),
-                        Vector3.new(-size.X,  size.Y,  size.Z),
-                        Vector3.new( size.X, -size.Y,  size.Z),
-                        Vector3.new(-size.X, -size.Y,  size.Z),
-                        Vector3.new( size.X,  size.Y, -size.Z),
-                        Vector3.new(-size.X,  size.Y, -size.Z),
-                        Vector3.new( size.X, -size.Y, -size.Z),
-                        Vector3.new(-size.X, -size.Y, -size.Z),
-                    }) do
-                        local pos, visible = camera:WorldToViewportPoint(cf:PointToWorldSpace(offset))
-                        if visible then
-                            local v2 = Vector2.new(pos.X, pos.Y)
-                            min = min:Min(v2)
-                            max = max:Max(v2)
-                            onscreen = true
-                        end
-                    end
-                end
+    box = {
+        enabled = true,
+        type = "normal", -- normal, corner
+        padding = 1.15,
+        corner_length = 0.25, -- corner mode: fraction of the shortest side
+        thickness = 3, -- outline thickness
+        fill = Color3.new(1, 1, 1),
+        outline = Color3.new(0, 0, 0),
+    },
+    healthbar = {
+        enabled = true,
+        width = 1,
+        fill = Color3.new(0, 1, 0),
+        outline = Color3.new(0, 0, 0),
+        text = {
+            enabled = false,
+            format = "both", -- both, numbers, percent
+            size = 13,
+            fill = Color3.new(1, 1, 1),
+        },
+    },
+    dynamic_text = {
+        enabled = true,
+        fill = Color3.new(1, 1, 1),
+        size = 13,
+        y_offset = 0, -- pixels above the box
+        line_spacing = 2,
+        outline = true,
+    },
+    distance = {
+        enabled = true,
+        fill = Color3.new(1, 1, 1),
+        size = 13,
+        outline = true,
+    },
+    tracer = {
+        enabled = true,
+        fill = Color3.new(1, 1, 1),
+        outline = Color3.new(0, 0, 0),
+        from = "mouse", -- mouse, head, top, bottom, center, custom
+        origin = Vector2.new(0, 0), -- used by `custom`, (0, 0) = default screen point
+        from_offset = 135, -- default custom origin: (width / 2, height - from_offset)
+        thickness = 1,
+        outline_thickness = 3,
+    },
+    skeleton = {
+        enabled = true,
+        head = Color3.new(1, 0, 0),
+        color = Color3.new(1, 1, 1),
+        thickness = 2,
+        head_circle = true,
+    },
+    head_dot = {
+        enabled = false,
+        filled = true,
+        size = 1, -- multiplier of the projected head radius
+        thickness = 1,
+        fill = Color3.new(1, 1, 1),
+    },
+    minimum_health = {
+        enabled = true,
+        value = 0,
+    }, -- if health is at or below this value, hide everything for that instance
+    team = {
+        check = false, -- skip teammates entirely
+        colors = false, -- color players by friendly / enemy / team color
+        use_team_color = false,
+        friendly = Color3.new(0, 1, 0),
+        enemy = Color3.new(1, 0, 0),
+    },
+    filters = {
+        max_distance = 0, -- studs, 0 = unlimited
+        visibility_check = false,
+    },
+    rainbow = false,
+    rainbow_speed = 0.35,
+    crosshair = {
+        enabled = false,
+        size = 10,
+        gap = 4,
+        thickness = 1,
+        outline_thickness = 3,
+        fill = Color3.new(1, 1, 1),
+        outline = Color3.new(0, 0, 0),
+    },
+}
+
+-- // table
+local esplib = getgenv().esplib
+if type(esplib) ~= "table" then
+    esplib = {}
+    getgenv().esplib = esplib
+end
+
+local function copy_config(source, target)
+    for key, value in pairs(source) do
+        if type(value) == "table" then
+            if type(target[key]) ~= "table" then
+                target[key] = {}
+            end
+            copy_config(value, target[key])
+        else
+            target[key] = value
+        end
+    end
+end
+
+local function fill_missing(target, source)
+    for key, value in pairs(source) do
+        if type(value) == "table" then
+            if type(target[key]) ~= "table" then
+                target[key] = {}
+            end
+            fill_missing(target[key], value)
+        elseif target[key] == nil then
+            target[key] = value
+        end
+    end
+end
+
+fill_missing(esplib, defaults)
+if type(esplib.defaults) ~= "table" then
+    esplib.defaults = {}
+end
+copy_config(defaults, esplib.defaults)
+
+getgenv().espinstances = getgenv().espinstances or {}
+local espinstances = getgenv().espinstances
+local espfunctions = {}
+
+-- // constants
+local CORNER_SIGNS = {
+    { 1, 1, 1 }, { 1, 1, -1 }, { 1, -1, 1 }, { 1, -1, -1 },
+    { -1, 1, 1 }, { -1, 1, -1 }, { -1, -1, 1 }, { -1, -1, -1 },
+}
+
+local SKELETON_BONES = {
+    { "Head", "Neck" },
+    { "Neck", "UpperTorso" },
+    { "UpperTorso", "LowerTorso" },
+    { "LowerTorso", "HumanoidRootPart" },
+
+    { "UpperTorso", "LeftUpperArm" },
+    { "LeftUpperArm", "LeftLowerArm" },
+    { "LeftLowerArm", "LeftHand" },
+
+    { "UpperTorso", "RightUpperArm" },
+    { "RightUpperArm", "RightLowerArm" },
+    { "RightLowerArm", "RightHand" },
+
+    { "LowerTorso", "LeftUpperLeg" },
+    { "LeftUpperLeg", "LeftLowerLeg" },
+    { "LeftLowerLeg", "LeftFoot" },
+
+    { "LowerTorso", "RightUpperLeg" },
+    { "RightUpperLeg", "RightLowerLeg" },
+    { "RightLowerLeg", "RightFoot" },
+
+    -- R6
+    { "Torso", "Head" },
+    { "Torso", "Left Arm" },
+    { "Torso", "Right Arm" },
+    { "Torso", "Left Leg" },
+    { "Torso", "Right Leg" },
+}
+
+-- // helpers
+local function hide_drawings(data)
+    local drawings = data.drawings
+    for i = 1, #drawings do
+        local drawing = drawings[i]
+        if drawing.Visible then
+            drawing.Visible = false
+        end
+    end
+end
+
+local function record(instance)
+    local data = espinstances[instance]
+    if not data then
+        data = {
+            drawings = {},
+            texts = {},
+            text_order = {},
+        }
+        espinstances[instance] = data
+    end
+    return data
+end
+
+local function add_drawing(data, drawing)
+    table.insert(data.drawings, drawing)
+    return drawing
+end
+
+local function get_parts(instance)
+    local data = espinstances[instance]
+    local now = os.clock()
+    if data and data.parts and now - (data.parts_at or 0) < 0.5 then
+        return data.parts
+    end
+
+    local parts = {}
+    if instance:IsA("BasePart") then
+        parts[1] = instance
+    elseif instance:IsA("Accessory") or instance:IsA("Tool") then
+        local handle = instance:FindFirstChild("Handle")
+        if handle and handle:IsA("BasePart") then
+            parts[1] = handle
+        end
+    else
+        for _, descendant in ipairs(instance:GetDescendants()) do
+            if descendant:IsA("BasePart") then
+                table.insert(parts, descendant)
             end
         end
-    elseif instance:IsA("BasePart") then
-        local size = (instance.Size / 2)
-        local cf = instance.CFrame
-        for _, offset in ipairs({
-            Vector3.new( size.X,  size.Y,  size.Z),
-            Vector3.new(-size.X,  size.Y,  size.Z),
-            Vector3.new( size.X, -size.Y,  size.Z),
-            Vector3.new(-size.X, -size.Y,  size.Z),
-            Vector3.new( size.X,  size.Y, -size.Z),
-            Vector3.new(-size.X,  size.Y, -size.Z),
-            Vector3.new( size.X, -size.Y, -size.Z),
-            Vector3.new(-size.X, -size.Y, -size.Z),
-        }) do
-            local pos, visible = camera:WorldToViewportPoint(cf:PointToWorldSpace(offset))
-            if visible then
-                local v2 = Vector2.new(pos.X, pos.Y)
-                min = min:Min(v2)
-                max = max:Max(v2)
-                onscreen = true
+    end
+
+    if data then
+        data.parts = parts
+        data.parts_at = now
+    end
+    return parts
+end
+
+local function get_reference_position(instance, parts)
+    if instance:IsA("BasePart") then
+        return instance.Position
+    end
+
+    if instance:IsA("Model") then
+        local part = instance.PrimaryPart
+        if not part then
+            part = instance:FindFirstChild("HumanoidRootPart")
+                or instance:FindFirstChild("Head")
+                or instance:FindFirstChild("Torso")
+                or instance:FindFirstChildWhichIsA("BasePart")
+        end
+        if part then
+            return part.Position
+        end
+    end
+
+    for _, part in ipairs(parts) do
+        if part.Parent then
+            return part.Position
+        end
+    end
+end
+
+local function get_bounding_box(camera, parts, padding)
+    local min = Vector2.new(math.huge, math.huge)
+    local max = Vector2.new(-math.huge, -math.huge)
+    local onscreen = false
+
+    for _, part in ipairs(parts) do
+        if part.Parent then
+            local half = (part.Size * 0.5) * padding
+            local cf = part.CFrame
+            for i = 1, 8 do
+                local sign = CORNER_SIGNS[i]
+                local world = cf:PointToWorldSpace(
+                    Vector3.new(half.X * sign[1], half.Y * sign[2], half.Z * sign[3])
+                )
+                local position, visible = camera:WorldToViewportPoint(world)
+                if visible then
+                    local point = Vector2.new(position.X, position.Y)
+                    min = min:Min(point)
+                    max = max:Max(point)
+                    onscreen = true
+                end
             end
         end
     end
@@ -145,13 +301,62 @@ local function get_bounding_box(instance)
     return min, max, onscreen
 end
 
-function espfunctions.add_box(instance)
-    if not instance or espinstances[instance] and espinstances[instance].box then return end
+local function is_teammate(player)
+    if not player or player == local_player then
+        return false
+    end
+    if player.Neutral and local_player and local_player.Neutral then
+        return true
+    end
+    if not local_player then
+        return false
+    end
+    return player.TeamColor == local_player.TeamColor
+end
 
-    local box = {}
+local function rainbow_color()
+    return Color3.fromHSV((os.clock() * (esplib.rainbow_speed or 0.35)) % 1, 1, 1)
+end
+
+local function clamp_to_viewport(point, viewport)
+    local center = Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
+    local delta = point - center
+    local half_x = math.max(viewport.X * 0.5, 1)
+    local half_y = math.max(viewport.Y * 0.5, 1)
+    local scale = math.min(
+        half_x / math.max(math.abs(delta.X), 1e-4),
+        half_y / math.max(math.abs(delta.Y), 1e-4)
+    )
+    if scale > 1 then
+        scale = 1
+    end
+    return center + delta * scale
+end
+
+local function format_health(health, max_health, format)
+    health = math.floor(health + 0.5)
+    max_health = math.max(1, math.floor(max_health + 0.5))
+    local percent = math.floor(health / max_health * 100 + 0.5)
+    if format == "percent" then
+        return percent .. "%"
+    elseif format == "numbers" then
+        return health .. "/" .. max_health
+    end
+    return health .. "/" .. max_health .. " [" .. percent .. "%]"
+end
+
+-- // instance functions
+function espfunctions.add_box(instance)
+    if not instance then
+        return
+    end
+    local data = record(instance)
+    if data.box then
+        return data.box
+    end
 
     local outline = Drawing.new("Square")
-    outline.Thickness = 3
+    outline.Thickness = esplib.box.thickness
     outline.Filled = false
     outline.Transparency = 1
     outline.Visible = false
@@ -162,231 +367,496 @@ function espfunctions.add_box(instance)
     fill.Transparency = 1
     fill.Visible = false
 
-    box.outline = outline
-    box.fill = fill
+    local box = {
+        outline = outline,
+        fill = fill,
+        corner_fill = {},
+        corner_outline = {},
+    }
 
-    box.corner_fill = {}
-    box.corner_outline = {}
-    for i = 1, 8 do
-        local outline = Drawing.new("Line")
-        outline.Thickness = 3
-        outline.Transparency = 1
-        outline.Visible = false
+    add_drawing(data, outline)
+    add_drawing(data, fill)
 
-        local fill = Drawing.new("Line")
-        fill.Thickness = 1
-        fill.Transparency = 1
-        fill.Visible = false
-        table.insert(box.corner_fill, fill)
+    for _ = 1, 8 do
+        local corner_outline = add_drawing(data, Drawing.new("Line"))
+        corner_outline.Thickness = esplib.box.thickness
+        corner_outline.Transparency = 1
+        corner_outline.Visible = false
 
-        table.insert(box.corner_outline, outline)
+        local corner_fill = add_drawing(data, Drawing.new("Line"))
+        corner_fill.Thickness = 1
+        corner_fill.Transparency = 1
+        corner_fill.Visible = false
+
+        table.insert(box.corner_outline, corner_outline)
+        table.insert(box.corner_fill, corner_fill)
     end
 
-    espinstances[instance] = espinstances[instance] or {}
-    espinstances[instance].box = box
+    data.box = box
+    return box
 end
 
 function espfunctions.add_healthbar(instance)
-    if not instance or espinstances[instance] and espinstances[instance].healthbar then return end
+    if not instance then
+        return
+    end
+    local data = record(instance)
+    if data.healthbar then
+        return data.healthbar
+    end
+
     local outline = Drawing.new("Square")
     outline.Thickness = 1
     outline.Filled = true
     outline.Transparency = 1
+    outline.Visible = false
 
     local fill = Drawing.new("Square")
     fill.Filled = true
     fill.Transparency = 1
+    fill.Visible = false
 
-    espinstances[instance] = espinstances[instance] or {}
-    espinstances[instance].healthbar = {
-        outline = outline,
-        fill = fill,
-    }
-end
-
-function espfunctions.add_dynamic_text(instance, value_name, text)
-    if not instance or espinstances[instance] and espinstances[instance].name then return end
-    local text_object = Drawing.new("Text")
-    text_object.Center = true
-    text_object.Outline = true
-    text_object.Font = 1
-    text_object.Transparency = 1
-    text_object.Text = text
-
-    espinstances[instance] = espinstances[instance] or {}
-    espinstances[instance].texts = espinstances[instance].texts or {}
-    espinstances[instance].texts[value_name] = text_object
-end
-
-
-function espfunctions.add_distance(instance)
-    if not instance or espinstances[instance] and espinstances[instance].distance then return end
     local text = Drawing.new("Text")
     text.Center = true
     text.Outline = true
     text.Font = 1
     text.Transparency = 1
+    text.Visible = false
 
-    espinstances[instance] = espinstances[instance] or {}
-    espinstances[instance].distance = text
+    add_drawing(data, outline)
+    add_drawing(data, fill)
+    add_drawing(data, text)
+
+    data.healthbar = {
+        outline = outline,
+        fill = fill,
+        text = text,
+    }
+    return data.healthbar
+end
+
+function espfunctions.add_dynamic_text(instance, value_name, text)
+    if not instance or not value_name then
+        return
+    end
+    local data = record(instance)
+
+    local existing = data.texts[value_name]
+    if existing then
+        existing.Text = tostring(text or existing.Text)
+        return existing
+    end
+
+    local drawing = Drawing.new("Text")
+    drawing.Center = true
+    drawing.Outline = esplib.dynamic_text.outline
+    drawing.Font = 1
+    drawing.Transparency = 1
+    drawing.Text = tostring(text or instance.Name)
+    drawing.Visible = false
+
+    add_drawing(data, drawing)
+    data.texts[value_name] = drawing
+    table.insert(data.text_order, value_name)
+    return drawing
+end
+
+function espfunctions.add_name(instance, name)
+    return espfunctions.add_dynamic_text(instance, "name", name or (instance and instance.Name) or "?")
+end
+
+function espfunctions.set_text(instance, value_name, text)
+    local data = instance and espinstances[instance]
+    local drawing = data and data.texts[value_name]
+    if drawing then
+        drawing.Text = tostring(text)
+    end
+end
+
+function espfunctions.add_distance(instance)
+    if not instance then
+        return
+    end
+    local data = record(instance)
+    if data.distance then
+        return data.distance
+    end
+
+    local drawing = Drawing.new("Text")
+    drawing.Center = true
+    drawing.Outline = esplib.distance.outline
+    drawing.Font = 1
+    drawing.Transparency = 1
+    drawing.Visible = false
+
+    add_drawing(data, drawing)
+    data.distance = drawing
+    return drawing
 end
 
 function espfunctions.add_tracer(instance)
-    if not instance or espinstances[instance] and espinstances[instance].tracer then return end
+    if not instance then
+        return
+    end
+    local data = record(instance)
+    if data.tracer then
+        return data.tracer
+    end
+
     local outline = Drawing.new("Line")
-    outline.Thickness = 3
+    outline.Thickness = esplib.tracer.outline_thickness
     outline.Transparency = 1
+    outline.Visible = false
 
     local fill = Drawing.new("Line")
-    fill.Thickness = 1
+    fill.Thickness = esplib.tracer.thickness
     fill.Transparency = 1
+    fill.Visible = false
 
-    espinstances[instance] = espinstances[instance] or {}
-    espinstances[instance].tracer = {
+    add_drawing(data, outline)
+    add_drawing(data, fill)
+
+    data.tracer = {
         outline = outline,
         fill = fill,
     }
+    return data.tracer
 end
 
 function espfunctions.add_skeleton(instance)
-    if not instance or espinstances[instance] and espinstances[instance].skeleton then return end
-
-    -- common R15/R6-ish bone pairs; will only draw when both parts exist
-    local bones = {
-        {"Head","Neck"},
-        {"Neck","UpperTorso"},
-        {"UpperTorso","LowerTorso"},
-        {"LowerTorso","HumanoidRootPart"},
-
-        {"UpperTorso","LeftUpperArm"},
-        {"LeftUpperArm","LeftLowerArm"},
-        {"LeftLowerArm","LeftHand"},
-
-        {"UpperTorso","RightUpperArm"},
-        {"RightUpperArm","RightLowerArm"},
-        {"RightLowerArm","RightHand"},
-
-        {"LowerTorso","LeftUpperLeg"},
-        {"LeftUpperLeg","LeftLowerLeg"},
-        {"LeftLowerLeg","LeftFoot"},
-
-        {"LowerTorso","RightUpperLeg"},
-        {"RightUpperLeg","RightLowerLeg"},
-        {"RightLowerLeg","RightFoot"},
-    }
+    if not instance then
+        return
+    end
+    local data = record(instance)
+    if data.skeleton then
+        return data.skeleton
+    end
 
     local lines = {}
-    for i = 1, #bones do
+    for _ = 1, #SKELETON_BONES do
         local line = Drawing.new("Line")
-        line.Thickness = esplib.skeleton.thickness or 2
+        line.Thickness = esplib.skeleton.thickness
         line.Transparency = 1
         line.Visible = false
+        add_drawing(data, line)
         table.insert(lines, line)
     end
 
-    -- head circle
     local head_circle = Drawing.new("Circle")
-    head_circle.Thickness = esplib.skeleton.thickness or 2
+    head_circle.Thickness = esplib.skeleton.thickness
     head_circle.Filled = false
     head_circle.Transparency = 1
     head_circle.Visible = false
+    add_drawing(data, head_circle)
 
-    espinstances[instance] = espinstances[instance] or {}
-    espinstances[instance].skeleton = {
-        bones = bones,
+    data.skeleton = {
+        bones = SKELETON_BONES,
         lines = lines,
         head_circle = head_circle,
+        parts = nil,
+        parts_at = 0,
     }
+    return data.skeleton
+end
+
+function espfunctions.add_head_dot(instance)
+    if not instance then
+        return
+    end
+    local data = record(instance)
+    if data.head_dot then
+        return data.head_dot
+    end
+
+    local dot = Drawing.new("Circle")
+    dot.Filled = esplib.head_dot.filled
+    dot.Thickness = esplib.head_dot.thickness
+    dot.Transparency = 1
+    dot.Visible = false
+
+    add_drawing(data, dot)
+    data.head_dot = dot
+    return dot
+end
+
+function espfunctions.set_color(instance, color)
+    local data = instance and espinstances[instance]
+    if data then
+        data.color = color
+    end
 end
 
 function espfunctions.remove_esp(instance)
-    if not instance or not espinstances[instance] then return end
-    local data = espinstances[instance]
+    local data = instance and espinstances[instance]
+    if not data then
+        return
+    end
 
-    if data.box then
-        data.box.outline:Remove()
-        data.box.fill:Remove()
-        for _, line in ipairs(data.box.corner_fill) do
-            line:Remove()
-        end
-        for _, line in ipairs(data.box.corner_outline) do
-            line:Remove()
-        end
-    end
-    if data.healthbar then
-        data.healthbar.outline:Remove()
-        data.healthbar.fill:Remove()
-    end
-    if data.texts then
-        for _, text in pairs(data.texts) do
-            text:Remove()
-        end
-    end
-    if data.distance then
-        data.distance:Remove()
-    end
-    if data.tracer then
-        data.tracer.outline:Remove()
-        data.tracer.fill:Remove()
-    end
-    if data.skeleton then
-        for _, line in ipairs(data.skeleton.lines) do
-            line:Remove()
-        end
-        if data.skeleton.head_circle then
-            data.skeleton.head_circle:Remove()
-        end
+    local drawings = data.drawings
+    for i = 1, #drawings do
+        pcall(function()
+            drawings[i]:Remove()
+        end)
     end
 
     espinstances[instance] = nil
 end
 
-function espfunctions.unload()
-    for instance, _ in pairs(espinstances) do
-        espfunctions.remove_esp(instance)
+-- // crosshair
+local crosshair = {}
+
+local CROSSHAIR_DIRECTIONS = {
+    Vector2.new(1, 0),
+    Vector2.new(-1, 0),
+    Vector2.new(0, 1),
+    Vector2.new(0, -1),
+}
+
+local function get_crosshair()
+    for i = 1, 4 do
+        local entry = crosshair[i]
+        if not entry then
+            local fill = Drawing.new("Line")
+            fill.Visible = false
+            local outline = Drawing.new("Line")
+            outline.Visible = false
+            entry = { fill = fill, outline = outline }
+            crosshair[i] = entry
+        end
     end
-    espinstances = {}
+    return crosshair
+end
+
+local function update_crosshair(config, viewport)
+    local enabled = config.enabled
+    if not enabled and #crosshair == 0 then
+        return
+    end
+
+    local entries = get_crosshair()
+    local center = Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
+    local gap = config.gap
+    local size = config.size
+
+    for i = 1, 4 do
+        local entry = entries[i]
+        if enabled then
+            local direction = CROSSHAIR_DIRECTIONS[i]
+            local from = center + direction * gap
+            local to = center + direction * (gap + size)
+
+            entry.fill.From = from
+            entry.fill.To = to
+            entry.fill.Thickness = config.thickness
+            entry.fill.Color = config.fill
+            entry.fill.Visible = true
+
+            entry.outline.From = center + direction * math.max(gap - 1, 0)
+            entry.outline.To = center + direction * (gap + size + 1)
+            entry.outline.Thickness = config.outline_thickness
+            entry.outline.Color = config.outline
+            entry.outline.Visible = true
+        else
+            entry.fill.Visible = false
+            entry.outline.Visible = false
+        end
+    end
 end
 
 -- // main thread
-run_service.RenderStepped:Connect(function()
-    for instance, data in pairs(espinstances) do
-        if esplib.minimum_health.enabled then
-            local humanoid = instance:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                if humanoid.Health <= esplib.minimum_health.value then
-                    espfunctions.remove_esp(instance)
-                    continue
-                end
+local render_connection
+local render_hidden = false
+local ray_params
+
+local function render()
+    local config = esplib
+    local camera = workspace.CurrentCamera
+    if not camera then
+        return
+    end
+
+    local viewport = camera.ViewportSize
+    local local_character = local_player and local_player.Character
+
+    if config.crosshair.enabled or #crosshair > 0 then
+        update_crosshair(config.crosshair, viewport)
+    end
+
+    if not config.enabled then
+        for instance, data in pairs(espinstances) do
+            if not instance.Parent then
+                espfunctions.remove_esp(instance)
+            elseif not render_hidden then
+                hide_drawings(data)
             end
-        elseif not instance or not instance.Parent then
+        end
+        render_hidden = true
+        return
+    end
+    render_hidden = false
+
+    local box_config = config.box
+    local healthbar_config = config.healthbar
+    local health_text_config = healthbar_config.text
+    local text_config = config.dynamic_text
+    local distance_config = config.distance
+    local tracer_config = config.tracer
+    local skeleton_config = config.skeleton
+    local head_dot_config = config.head_dot
+    local team_config = config.team
+    local filters = config.filters
+    local minimum_health = config.minimum_health
+    local check_teams = team_config.check or team_config.colors
+    local rainbow = config.rainbow
+
+    local ray_filter = { camera }
+    if local_character then
+        table.insert(ray_filter, local_character)
+    end
+
+    if filters.visibility_check and not ray_params then
+        ray_params = RaycastParams.new()
+        ray_params.FilterType = Enum.RaycastFilterType.Exclude
+        ray_params.IgnoreWater = true
+        ray_params.RespectCanCollide = false
+    end
+
+    for instance, data in pairs(espinstances) do
+        if not instance.Parent then
             espfunctions.remove_esp(instance)
             continue
         end
 
-        if instance:IsA("Model") and not instance.PrimaryPart then
+        local player
+        if check_teams then
+            player = instance:IsA("Model") and players:GetPlayerFromCharacter(instance) or nil
+            if player and team_config.check and is_teammate(player) then
+                hide_drawings(data)
+                continue
+            end
+        end
+
+        local humanoid = instance:FindFirstChildOfClass("Humanoid")
+        if minimum_health.enabled and humanoid and humanoid.Health <= minimum_health.value then
+            hide_drawings(data)
             continue
         end
 
-        local min, max, onscreen = get_bounding_box(instance)
+        local parts = get_parts(instance)
+        local position = get_reference_position(instance, parts)
+        if not position then
+            hide_drawings(data)
+            continue
+        end
+
+        local distance = (camera.CFrame.Position - position).Magnitude
+        if filters.max_distance > 0 and distance > filters.max_distance then
+            hide_drawings(data)
+            continue
+        end
+
+        if ray_params then
+            local origin = camera.CFrame.Position
+            local delta = position - origin
+            local length = delta.Magnitude
+            if length > 0.01 then
+                table.insert(ray_filter, instance)
+                ray_params.FilterDescendantsInstances = ray_filter
+                local result = workspace:Raycast(origin, delta.Unit * length, ray_params)
+                table.remove(ray_filter)
+                if result and result.Instance and result.Instance.Transparency < 0.3 then
+                    hide_drawings(data)
+                    continue
+                end
+            end
+        end
+
+        local accent
+        if rainbow then
+            accent = rainbow_color()
+        elseif data.color then
+            accent = data.color
+        end
+
+        if not accent and team_config.colors and player then
+            if team_config.use_team_color then
+                accent = player.Team and player.Team.TeamColor.Color or player.TeamColor.Color
+            else
+                accent = is_teammate(player) and team_config.friendly or team_config.enemy
+            end
+        end
+
+        local min, max, onscreen = get_bounding_box(camera, parts, box_config.padding)
+
+        local center_x = (min.X + max.X) * 0.5
+        local center_y = (min.Y + max.Y) * 0.5
 
         if data.box then
             local box = data.box
+            if box_config.enabled and onscreen then
+                local width = max.X - min.X
+                local height = max.Y - min.Y
 
-            if esplib.box.enabled and onscreen then
-                local x, y = min.X, min.Y
-                local w, h = (max - min).X, (max - min).Y
-                local len = math.min(w, h) * 0.25
+                box.outline.Thickness = box_config.thickness
+                box.outline.Color = box_config.outline
+                box.fill.Color = accent or box_config.fill
 
-                if esplib.box.type == "normal" then
+                if box_config.type == "corner" then
+                    local length = math.min(width, height) * box_config.corner_length
+                    local left = min.X
+                    local top = min.Y
+                    local right = max.X
+                    local bottom = max.Y
+
+                    local fill_lines = box.corner_fill
+                    local outline_lines = box.corner_outline
+                    local outline_color = box_config.outline
+                    local fill_color = accent or box_config.fill
+
+                    local corners = {
+                        { Vector2.new(left, top), Vector2.new(left + length, top) },
+                        { Vector2.new(left, top), Vector2.new(left, top + length) },
+
+                        { Vector2.new(right - length, top), Vector2.new(right, top) },
+                        { Vector2.new(right, top), Vector2.new(right, top + length) },
+
+                        { Vector2.new(left, bottom), Vector2.new(left + length, bottom) },
+                        { Vector2.new(left, bottom - length), Vector2.new(left, bottom) },
+
+                        { Vector2.new(right - length, bottom), Vector2.new(right, bottom) },
+                        { Vector2.new(right, bottom - length), Vector2.new(right, bottom) },
+                    }
+
+                    for i = 1, 8 do
+                        local from = corners[i][1]
+                        local to = corners[i][2]
+                        local direction = (to - from).Unit
+                        local oFrom = from - direction
+                        local oTo = to + direction
+
+                        local outline_line = outline_lines[i]
+                        outline_line.From = oFrom
+                        outline_line.To = oTo
+                        outline_line.Thickness = box_config.thickness
+                        outline_line.Color = outline_color
+                        outline_line.Visible = true
+
+                        local fill_line = fill_lines[i]
+                        fill_line.From = from
+                        fill_line.To = to
+                        fill_line.Color = fill_color
+                        fill_line.Visible = true
+                    end
+
+                    box.outline.Visible = false
+                    box.fill.Visible = false
+                else
                     box.outline.Position = min
                     box.outline.Size = max - min
-                    box.outline.Color = esplib.box.outline
                     box.outline.Visible = true
 
                     box.fill.Position = min
                     box.fill.Size = max - min
-                    box.fill.Color = esplib.box.fill
                     box.fill.Visible = true
 
                     for _, line in ipairs(box.corner_fill) do
@@ -395,48 +865,6 @@ run_service.RenderStepped:Connect(function()
                     for _, line in ipairs(box.corner_outline) do
                         line.Visible = false
                     end
-
-                elseif esplib.box.type == "corner" then
-                    local fill_lines = box.corner_fill
-                    local outline_lines = box.corner_outline
-                    local fill_color = esplib.box.fill
-                    local outline_color = esplib.box.outline
-
-                    local corners = {
-                        { Vector2.new(x, y), Vector2.new(x + len, y) },
-                        { Vector2.new(x, y), Vector2.new(x, y + len) },
-
-                        { Vector2.new(x + w - len, y), Vector2.new(x + w, y) },
-                        { Vector2.new(x + w, y), Vector2.new(x + w, y + len) },
-
-                        { Vector2.new(x, y + h), Vector2.new(x + len, y + h) },
-                        { Vector2.new(x, y + h - len), Vector2.new(x, y + h) },
-
-                        { Vector2.new(x + w - len, y + h), Vector2.new(x + w, y + h) },
-                        { Vector2.new(x + w, y + h - len), Vector2.new(x + w, y + h) },
-                    }
-
-                    for i = 1, 8 do
-                        local from, to = corners[i][1], corners[i][2]
-                        local dir = (to - from).Unit
-                        local oFrom = from - dir
-                        local oTo = to + dir
-
-                        local o = outline_lines[i]
-                        o.From = oFrom
-                        o.To = oTo
-                        o.Color = outline_color
-                        o.Visible = true
-
-                        local f = fill_lines[i]
-                        f.From = from
-                        f.To = to
-                        f.Color = fill_color
-                        f.Visible = true
-                    end
-
-                    box.outline.Visible = false
-                    box.fill.Visible = false
                 end
             else
                 box.outline.Visible = false
@@ -451,152 +879,188 @@ run_service.RenderStepped:Connect(function()
         end
 
         if data.healthbar then
-            local outline, fill = data.healthbar.outline, data.healthbar.fill
+            local outline = data.healthbar.outline
+            local fill = data.healthbar.fill
+            local height = max.Y - min.Y
+            local bar_width = math.max(1, healthbar_config.width)
+            local padding = 1
 
-            if not esplib.healthbar.enabled or not onscreen then
+            if healthbar_config.enabled and onscreen and humanoid then
+                local x = min.X - 4 - bar_width
+                local y = min.Y - padding
+                local health = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
+                local fill_height = height * health
+
+                outline.Color = healthbar_config.outline
+                outline.Position = Vector2.new(x, y)
+                outline.Size = Vector2.new(bar_width + 2 * padding, height + 2 * padding)
+                outline.Visible = true
+
+                fill.Color = healthbar_config.fill
+                fill.Position = Vector2.new(x + padding, y + padding + height - fill_height)
+                fill.Size = Vector2.new(bar_width, fill_height)
+                fill.Visible = true
+            else
                 outline.Visible = false
                 fill.Visible = false
+            end
+
+            local health_text = data.healthbar.text
+            if health_text_config.enabled and onscreen and humanoid then
+                local health = humanoid.Health
+                local max_health = humanoid.MaxHealth
+                if data.health_value ~= health or data.health_max ~= max_health or data.health_format ~= health_text_config.format then
+                    data.health_value = health
+                    data.health_max = max_health
+                    data.health_format = health_text_config.format
+                    data.health_string = format_health(health, max_health, health_text_config.format)
+                end
+
+                health_text.Text = data.health_string
+                health_text.Size = health_text_config.size
+                health_text.Color = health_text_config.fill
+                health_text.Outline = text_config.outline
+                health_text.Position = Vector2.new(
+                    center_x,
+                    max.Y + 3 + (distance_config.enabled and (distance_config.size + 1) or 0)
+                )
+                health_text.Visible = true
             else
-                local humanoid = instance:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    local height = max.Y - min.Y
-                    local padding = 1
-                    local x = min.X - 3 - 1 - padding
-                    local y = min.Y - padding
-                    local health = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-                    local fillheight = height * health
+                health_text.Visible = false
+            end
+        end
 
-                    outline.Color = esplib.healthbar.outline
-                    outline.Position = Vector2.new(x, y)
-                    outline.Size = Vector2.new(1 + 2 * padding, height + 2 * padding)
-                    outline.Visible = true
-
-                    fill.Color = esplib.healthbar.fill
-                    fill.Position = Vector2.new(x + padding, y + (height + padding) - fillheight)
-                    fill.Size = Vector2.new(1, fillheight)
-                    fill.Visible = true
+        if #data.text_order > 0 then
+            local y = min.Y - text_config.y_offset
+            local index = 0
+            for i = 1, #data.text_order do
+                local drawing = data.texts[data.text_order[i]]
+                if text_config.enabled and onscreen then
+                    drawing.Size = text_config.size
+                    drawing.Color = accent or text_config.fill
+                    drawing.Outline = text_config.outline
+                    drawing.Position = Vector2.new(center_x, y - index * (text_config.size + text_config.line_spacing))
+                    drawing.Visible = true
+                    index = index + 1
                 else
-                    outline.Visible = false
-                    fill.Visible = false
+                    drawing.Visible = false
                 end
             end
         end
-        if data.texts then
-            if esplib.dynamic_text.enabled and onscreen then
-                local number_of_texts = 0
-                for value_name, text_object in pairs(data.texts) do
-                    number_of_texts = number_of_texts + 1
-                    local center_x = (min.X + max.X) / 2
-                    local y = min.Y - esplib.dynamic_text.y_offset - (number_of_texts * esplib.dynamic_text.y_offset)
-                    
-                    text_object.Size = esplib.dynamic_text.size
-                    text_object.Color = esplib.dynamic_text.fill
-                    text_object.Position = Vector2.new(center_x, y)
-                    text_object.Visible = true
-                    
-                end
-            else
-                for _, text in pairs(data.texts) do
-                    text.Visible = false
-                end
-            end
-        end
-            
 
         if data.distance then
-            if esplib.distance.enabled and onscreen then
-                local text = data.distance
-                local center_x = (min.X + max.X) / 2
-                local y = max.Y + 5
-                local dist
-                if instance:IsA("Model") then
-                    if instance.PrimaryPart then
-                        dist = (camera.CFrame.Position - instance.PrimaryPart.Position).Magnitude
-                    else
-                        local part = instance:FindFirstChildWhichIsA("BasePart")
-                        if part then
-                            dist = (camera.CFrame.Position - part.Position).Magnitude
-                        else
-                            dist = 999
-                        end
-                    end
-                else
-                    dist = (camera.CFrame.Position - instance.Position).Magnitude
+            local drawing = data.distance
+            if distance_config.enabled and onscreen then
+                local rounded = math.floor(distance)
+                if data.distance_value ~= rounded then
+                    data.distance_value = rounded
+                    drawing.Text = rounded .. "m"
                 end
-                text.Text = tostring(math.floor(dist)) .. "m"
-                text.Size = esplib.distance.size
-                text.Color = esplib.distance.fill
-                text.Position = Vector2.new(center_x, y)
-                text.Visible = true
+                drawing.Size = distance_config.size
+                drawing.Color = accent or distance_config.fill
+                drawing.Outline = distance_config.outline
+                drawing.Position = Vector2.new(center_x, max.Y + 3)
+                drawing.Visible = true
             else
-                data.distance.Visible = false
+                drawing.Visible = false
             end
         end
 
         if data.tracer then
-            if esplib.tracer.enabled and onscreen then
-                local outline, fill = data.tracer.outline, data.tracer.fill
+            local tracer = data.tracer
+            local from
 
-                local from_pos = Vector2.new()
-                local to_pos = Vector2.new()
-
-                if esplib.tracer.from == "mouse" then
-                    local mouse_location = user_input_service:GetMouseLocation()
-                    from_pos = Vector2.new(mouse_location.X, mouse_location.Y)
-                elseif esplib.tracer.from == "head" then
+            if tracer_config.enabled then
+                local mode = tracer_config.from
+                if mode == "mouse" then
+                    from = user_input_service:GetMouseLocation()
+                elseif mode == "head" then
                     local head = instance:FindFirstChild("Head")
-                    if head then
-                        local pos, visible = camera:WorldToViewportPoint(head.Position)
-                        if visible then
-                            from_pos = Vector2.new(pos.X, pos.Y)
-                        else
-                            from_pos = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y)
+                    if head and head:IsA("BasePart") then
+                        local head_position, head_visible = camera:WorldToViewportPoint(head.Position)
+                        if head_visible then
+                            from = Vector2.new(head_position.X, head_position.Y)
                         end
-                    else
-                        from_pos = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y)
                     end
-                elseif esplib.tracer.from == "bottom" then
-                    from_pos = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y)
-                elseif esplib.tracer.from == "center" then
-                    from_pos = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
-                else
-                    from_pos = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y)
+                elseif mode == "top" then
+                    from = Vector2.new(viewport.X * 0.5, 0)
+                elseif mode == "center" then
+                    from = Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
+                elseif mode == "custom" then
+                    local origin = tracer_config.origin
+                    if origin and (origin.X ~= 0 or origin.Y ~= 0) then
+                        from = origin
+                    else
+                        from = Vector2.new(viewport.X * 0.5, viewport.Y - tracer_config.from_offset)
+                    end
                 end
 
-                to_pos = (min + max) / 2
+                if not from then
+                    from = Vector2.new(viewport.X * 0.5, viewport.Y)
+                end
 
-                outline.From = from_pos
-                outline.To = to_pos
-                outline.Color = esplib.tracer.outline
-                outline.Visible = true
+                local to
+                if onscreen then
+                    to = Vector2.new(center_x, center_y)
+                else
+                    local screen_position = camera:WorldToViewportPoint(position)
+                    local point = Vector2.new(screen_position.X, screen_position.Y)
+                    if screen_position.Z <= 0 then
+                        local center = Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
+                        point = center - (point - center)
+                    end
+                    to = clamp_to_viewport(point, viewport)
+                end
 
-                fill.From = from_pos
-                fill.To = to_pos
-                fill.Color = esplib.tracer.fill
-                fill.Visible = true
+                tracer.outline.From = from
+                tracer.outline.To = to
+                tracer.outline.Thickness = tracer_config.outline_thickness
+                tracer.outline.Color = tracer_config.outline
+                tracer.outline.Visible = true
+
+                tracer.fill.From = from
+                tracer.fill.To = to
+                tracer.fill.Thickness = tracer_config.thickness
+                tracer.fill.Color = accent or tracer_config.fill
+                tracer.fill.Visible = true
             else
-                data.tracer.outline.Visible = false
-                data.tracer.fill.Visible = false
+                tracer.outline.Visible = false
+                tracer.fill.Visible = false
             end
         end
 
         if data.skeleton then
-            if esplib.skeleton.enabled and onscreen then
-                local sk = data.skeleton
-                for i, pair in ipairs(sk.bones) do
-                    local aName, bName = pair[1], pair[2]
-                    local aPart = instance:FindFirstChild(aName)
-                    local bPart = instance:FindFirstChild(bName)
+            local skeleton = data.skeleton
+            local visible = skeleton_config.enabled and onscreen
 
-                    local line = sk.lines[i]
-                    if aPart and aPart:IsA("BasePart") and bPart and bPart:IsA("BasePart") then
-                        local apos, aVis = camera:WorldToViewportPoint(aPart.Position)
-                        local bpos, bVis = camera:WorldToViewportPoint(bPart.Position)
-                        if aVis and bVis then
-                            line.From = Vector2.new(apos.X, apos.Y)
-                            line.To = Vector2.new(bpos.X, bpos.Y)
-                            line.Color = esplib.skeleton.color
-                            line.Thickness = esplib.skeleton.thickness or line.Thickness
+            if visible then
+                local now = os.clock()
+                if not skeleton.parts or now - skeleton.parts_at > 0.25 then
+                    skeleton.parts_at = now
+                    local parts_cache = skeleton.parts or {}
+                    for i = 1, #skeleton.bones do
+                        local bone = skeleton.bones[i]
+                        parts_cache[bone[1]] = instance:FindFirstChild(bone[1]) or false
+                        parts_cache[bone[2]] = instance:FindFirstChild(bone[2]) or false
+                    end
+                    skeleton.parts = parts_cache
+                end
+
+                local parts_cache = skeleton.parts
+                for i = 1, #skeleton.bones do
+                    local bone = skeleton.bones[i]
+                    local line = skeleton.lines[i]
+                    local a = parts_cache[bone[1]]
+                    local b = parts_cache[bone[2]]
+
+                    if a and a.Parent and a:IsA("BasePart") and b and b.Parent and b:IsA("BasePart") then
+                        local a_position, a_visible = camera:WorldToViewportPoint(a.Position)
+                        local b_position, b_visible = camera:WorldToViewportPoint(b.Position)
+                        if a_visible and b_visible then
+                            line.From = Vector2.new(a_position.X, a_position.Y)
+                            line.To = Vector2.new(b_position.X, b_position.Y)
+                            line.Color = accent or skeleton_config.color
+                            line.Thickness = skeleton_config.thickness
                             line.Visible = true
                         else
                             line.Visible = false
@@ -606,41 +1070,100 @@ run_service.RenderStepped:Connect(function()
                     end
                 end
 
-                -- head circle
-                local head_circle = sk.head_circle
                 local head = instance:FindFirstChild("Head")
-                if head and head:IsA("BasePart") then
-                    local center3, centerVis = camera:WorldToViewportPoint(head.Position)
-                    -- compute a screen-space radius by projecting a local offset on the head
-                    local offsetWorld = head.CFrame:PointToWorldSpace(Vector3.new(head.Size.X * 0.5, 0, 0))
-                    local edge3, edgeVis = camera:WorldToViewportPoint(offsetWorld)
-                    if centerVis and edgeVis then
-                        local center2 = Vector2.new(center3.X, center3.Y)
-                        local edge2 = Vector2.new(edge3.X, edge3.Y)
-                        local radius = (edge2 - center2).Magnitude
-                        head_circle.Position = center2
-                        head_circle.Radius = math.max(1, radius)
-                        head_circle.Color = esplib.skeleton.head or esplib.skeleton.color
-                        head_circle.Thickness = esplib.skeleton.thickness or head_circle.Thickness
+                local head_circle = skeleton.head_circle
+                if skeleton_config.head_circle and head and head:IsA("BasePart") then
+                    local center, center_visible = camera:WorldToViewportPoint(head.Position)
+                    local offset = head.CFrame:PointToWorldSpace(Vector3.new(head.Size.X * 0.5, 0, 0))
+                    local edge, edge_visible = camera:WorldToViewportPoint(offset)
+                    if center_visible and edge_visible then
+                        local center_2d = Vector2.new(center.X, center.Y)
+                        local edge_2d = Vector2.new(edge.X, edge.Y)
+                        head_circle.Position = center_2d
+                        head_circle.Radius = math.max(1, (edge_2d - center_2d).Magnitude)
+                        head_circle.Color = accent or skeleton_config.head
+                        head_circle.Thickness = skeleton_config.thickness
                         head_circle.Visible = true
                     else
                         head_circle.Visible = false
                     end
-                elseif head_circle then
+                else
                     head_circle.Visible = false
                 end
             else
-                for _, line in ipairs(data.skeleton.lines) do
-                    line.Visible = false
+                for i = 1, #skeleton.lines do
+                    skeleton.lines[i].Visible = false
                 end
-                data.skeleton.head_circle.Visible = false
+                skeleton.head_circle.Visible = false
             end
         end
-    end -- end RenderStepped
-end)
--- attach functions to esplib and return
-for k, v in pairs(espfunctions) do
-    esplib[k] = v
+
+        if data.head_dot then
+            local dot = data.head_dot
+            local head = instance:FindFirstChild("Head")
+            if head_dot_config.enabled and onscreen and head and head:IsA("BasePart") then
+                local center, center_visible = camera:WorldToViewportPoint(head.Position)
+                local top, top_visible = camera:WorldToViewportPoint(
+                    head.CFrame:PointToWorldSpace(Vector3.new(0, head.Size.Y * 0.5, 0))
+                )
+                local bottom, bottom_visible = camera:WorldToViewportPoint(
+                    head.CFrame:PointToWorldSpace(Vector3.new(0, head.Size.Y * -0.5, 0))
+                )
+                if center_visible and top_visible and bottom_visible then
+                    local radius = math.abs(top.Y - bottom.Y) * 0.5 * head_dot_config.size
+                    dot.Position = Vector2.new(center.X, center.Y)
+                    dot.Radius = math.max(1, radius)
+                    dot.Thickness = head_dot_config.thickness
+                    dot.Filled = head_dot_config.filled
+                    dot.Color = accent or head_dot_config.fill
+                    dot.Visible = true
+                else
+                    dot.Visible = false
+                end
+            else
+                dot.Visible = false
+            end
+        end
+    end
 end
+
+-- // lifecycle
+function espfunctions.unload()
+    for instance in pairs(espinstances) do
+        espfunctions.remove_esp(instance)
+    end
+
+    for i = 1, #crosshair do
+        pcall(function()
+            crosshair[i].fill:Remove()
+            crosshair[i].outline:Remove()
+        end)
+        crosshair[i] = nil
+    end
+
+    if render_connection then
+        render_connection:Disconnect()
+        render_connection = nil
+    end
+    getgenv().esplib_connection = nil
+end
+
+function espfunctions.reset()
+    copy_config(esplib.defaults, esplib)
+end
+
+-- // attach functions
+for name, fn in pairs(espfunctions) do
+    esplib[name] = fn
+end
+
+esplib.api = 2
+
+if getgenv().esplib_connection then
+    getgenv().esplib_connection:Disconnect()
+end
+
+render_connection = run_service.RenderStepped:Connect(render)
+getgenv().esplib_connection = render_connection
 
 return esplib
