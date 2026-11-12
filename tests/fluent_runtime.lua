@@ -969,6 +969,7 @@ local function new_part(name, position, size)
     part.CFrame = CFrame.new(position)
     part.Position = part.CFrame.Position
     part.Transparency = 0
+    part.LocalTransparencyModifier = 0
     part.CanCollide = true
     return part
 end

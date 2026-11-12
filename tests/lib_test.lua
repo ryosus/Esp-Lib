@@ -235,12 +235,32 @@ M.workspace:AddChild(wall)
 MOCK.raycast_hit = wall
 step(1)
 check(data.box.outline.Visible == false, "visibility check hides occluded targets")
+check(data.texts.name.Visible == false, "visibility check hides names of occluded targets")
+check(data.distance.Visible == false, "visibility check hides distances of occluded targets")
+check(data.healthbar.outline.Visible == false, "visibility check hides health bars of occluded targets")
+check(data.tracer.fill.Visible == true, "visibility check keeps the tracer to an occluded target")
+
+-- a tracer must also survive for occluded targets that are off screen
+ESP.add_tracer(behind_character)
+ESP.add_box(behind_character)
+step(1)
+check(instances[behind_character].tracer.fill.Visible == true, "off-screen occluded targets keep their tracer")
+check(instances[behind_character].box.outline.Visible == false, "off-screen occluded targets have no box")
+
 wall.Transparency = 0.9
 step(1)
 check(data.box.outline.Visible == true, "transparent obstructions do not block")
+
+wall.Transparency = 0
+wall.LocalTransparencyModifier = 1
+step(1)
+check(data.box.outline.Visible == true, "locally hidden parts do not block")
+
+wall.LocalTransparencyModifier = 0
 MOCK.raycast_hit = nil
 step(1)
 check(data.box.outline.Visible == true, "clear line of sight shows targets")
+check(data.texts.name.Visible == true, "clear line of sight restores names")
 ESP.filters.visibility_check = false
 
 -- 11. tracer origins --------------------------------------------------------

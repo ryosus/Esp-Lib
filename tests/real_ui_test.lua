@@ -251,9 +251,12 @@ set("VisibilityCheck", true)
 RUNTIME.raycast_hit = E.new_part("Wall", E.Vector3.new(0, 0, -50), E.Vector3.new(20, 20, 1))
 step(1)
 check(enemy_data.box.outline.Visible == false, "visibility check hides occluded targets")
+check(enemy_data.texts.name.Visible == false, "visibility check hides occluded names")
+check(enemy_data.tracer.fill.Visible == true, "visibility check keeps tracers")
 RUNTIME.raycast_hit = nil
 step(1)
 check(enemy_data.box.outline.Visible == true, "visibility check shows clear targets")
+check(enemy_data.texts.name.Visible == true, "visibility check restores clear names")
 set("VisibilityCheck", false)
 
 -- box type through the real dropdown

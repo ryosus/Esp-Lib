@@ -93,7 +93,7 @@ local defaults = {
     },
     filters = {
         max_distance = 0, -- studs, 0 = unlimited
-        visibility_check = false,
+        visibility_check = false, -- hide on-screen details when a wall blocks the target
     },
     rainbow = false,
     rainbow_speed = 0.35,
@@ -345,6 +345,25 @@ local function clamp_to_viewport(point, viewport)
         scale = 1
     end
     return center + delta * scale
+end
+
+-- A hit only counts as a wall when it is actually opaque from this client's
+-- point of view; fully transparent parts, viewmodel parts hidden through
+-- LocalTransparencyModifier and non-part hits never block.
+local function is_opaque(instance)
+    if instance:IsA("Terrain") then
+        return true
+    end
+    if not instance:IsA("BasePart") then
+        return false
+    end
+    if instance.Transparency >= 0.3 then
+        return false
+    end
+    if instance.LocalTransparencyModifier >= 0.3 then
+        return false
+    end
+    return true
 end
 
 local function format_health(health, max_health, format)
@@ -761,6 +780,9 @@ local function render()
             continue
         end
 
+        -- Occlusion only suppresses the on-screen details; the tracer is the
+        -- off-screen indicator and must keep pointing at the target.
+        local blocked = false
         if ray_params then
             local origin = camera.CFrame.Position
             local delta = position - origin
@@ -770,9 +792,9 @@ local function render()
                 ray_params.FilterDescendantsInstances = ray_filter
                 local result = workspace:Raycast(origin, delta.Unit * length, ray_params)
                 table.remove(ray_filter)
-                if result and result.Instance and result.Instance.Transparency < 0.3 then
-                    hide_drawings(data)
-                    continue
+                local hit = result and result.Instance
+                if hit and is_opaque(hit) then
+                    blocked = true
                 end
             end
         end
@@ -799,7 +821,7 @@ local function render()
 
         if data.box then
             local box = data.box
-            if box_config.enabled and onscreen then
+            if box_config.enabled and onscreen and not blocked then
                 local width = max.X - min.X
                 local height = max.Y - min.Y
 
@@ -891,7 +913,7 @@ local function render()
             local bar_width = math.max(1, healthbar_config.width)
             local padding = 1
 
-            if healthbar_config.enabled and onscreen and humanoid then
+            if healthbar_config.enabled and onscreen and not blocked and humanoid then
                 local x = min.X - 4 - bar_width
                 local y = min.Y - padding
                 local health = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
@@ -912,7 +934,7 @@ local function render()
             end
 
             local health_text = data.healthbar.text
-            if health_text_config.enabled and onscreen and humanoid then
+            if health_text_config.enabled and onscreen and not blocked and humanoid then
                 local health = humanoid.Health
                 local max_health = humanoid.MaxHealth
                 if data.health_value ~= health or data.health_max ~= max_health or data.health_format ~= health_text_config.format then
@@ -941,7 +963,7 @@ local function render()
             local index = 0
             for i = 1, #data.text_order do
                 local drawing = data.texts[data.text_order[i]]
-                if text_config.enabled and onscreen then
+                if text_config.enabled and onscreen and not blocked then
                     drawing.Size = text_config.size
                     drawing.Color = accent or text_config.fill
                     drawing.Outline = text_config.outline
@@ -956,7 +978,7 @@ local function render()
 
         if data.distance then
             local drawing = data.distance
-            if distance_config.enabled and onscreen then
+            if distance_config.enabled and onscreen and not blocked then
                 local rounded = math.floor(distance)
                 if data.distance_value ~= rounded then
                     data.distance_value = rounded
@@ -1037,7 +1059,7 @@ local function render()
 
         if data.skeleton then
             local skeleton = data.skeleton
-            local visible = skeleton_config.enabled and onscreen
+            local visible = skeleton_config.enabled and onscreen and not blocked
 
             if visible then
                 local now = os.clock()
@@ -1085,7 +1107,7 @@ local function render()
         if data.head_dot then
             local dot = data.head_dot
             local head = instance:FindFirstChild("Head")
-            if head_dot_config.enabled and onscreen and head and head:IsA("BasePart") then
+            if head_dot_config.enabled and onscreen and not blocked and head and head:IsA("BasePart") then
                 local center, center_visible = camera:WorldToViewportPoint(head.Position)
                 local top, top_visible = camera:WorldToViewportPoint(
                     head.CFrame:PointToWorldSpace(Vector3.new(0, head.Size.Y * 0.5, 0))

@@ -531,7 +531,7 @@ add_control(filter_group, {
     kind = "toggle",
     name = "VisibilityCheck",
     title = "Visibility check",
-    description = "Raycast to the target and skip it when a wall is in the way",
+    description = "Hide box / name / health when a wall blocks the target; tracers keep pointing at it",
     get = function()
         return esplib.filters.visibility_check
     end,

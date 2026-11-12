@@ -416,6 +416,7 @@ local function part(name, position, size)
         CFrame = CFrame.new(position),
         Size = size or Vector3.new(1, 2, 1),
         Transparency = 0,
+        LocalTransparencyModifier = 0,
     })
     object.Position = object.CFrame.Position
     return object
