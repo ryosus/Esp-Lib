@@ -90,6 +90,7 @@ local defaults = {
         use_team_color = false,
         friendly = Color3.new(0, 1, 0),
         enemy = Color3.new(1, 0, 0),
+        excluded = {}, -- set of Team names that are never drawn: { ["Police"] = true }
     },
     filters = {
         max_distance = 0, -- studs, 0 = unlimited
@@ -133,10 +134,11 @@ end
 local function copy_config(source, target)
     for key, value in pairs(source) do
         if is_config_table(value) then
-            if not is_config_table(target[key]) then
-                target[key] = {}
-            end
-            copy_config(value, target[key])
+            -- rebuild option groups so keys absent from the source (e.g. an
+            -- excluded team) disappear on reset
+            local group = {}
+            copy_config(value, group)
+            target[key] = group
         else
             target[key] = value
         end
@@ -731,7 +733,8 @@ local function render()
     local team_config = config.team
     local filters = config.filters
     local minimum_health = config.minimum_health
-    local check_teams = team_config.check or team_config.colors
+    local excluded_teams = team_config.excluded
+    local check_teams = team_config.check or team_config.colors or next(excluded_teams) ~= nil
     local rainbow = config.rainbow
 
     local ray_filter = { camera }
@@ -755,9 +758,16 @@ local function render()
         local player
         if check_teams then
             player = instance:IsA("Model") and players:GetPlayerFromCharacter(instance) or nil
-            if player and team_config.check and is_teammate(player) then
-                hide_drawings(data)
-                continue
+            if player then
+                if team_config.check and is_teammate(player) then
+                    hide_drawings(data)
+                    continue
+                end
+                local team = player.Team
+                if team and excluded_teams[team.Name] then
+                    hide_drawings(data)
+                    continue
+                end
             end
         end
 
@@ -1163,7 +1173,7 @@ for name, fn in pairs(espfunctions) do
     esplib[name] = fn
 end
 
-esplib.api = 2
+esplib.api = 3
 
 if getgenv().esplib_connection then
     getgenv().esplib_connection:Disconnect()

@@ -78,13 +78,13 @@ check(Fluent ~= nil, "fluent module captured")
 check(Fluent.Version == "1.1.0", "real Fluent 1.1.0 loaded, got " .. tostring(Fluent and Fluent.Version))
 check(Fluent.Window ~= nil, "window created")
 check(getgenv().esplib == esplib, "esplib shared through getgenv")
-check(esplib.api == 2, "library api 2")
+check(esplib.api == 3, "library api 3")
 check(Fluent.UseAcrylic ~= nil, "acrylic flag present")
 check(Fluent.Acrylic == false, "blur disabled through ToggleAcrylic")
 
 -- // elements registered by the real library ------------------------------
 local expected = {
-    "ESPEnabled", "ESPToggleKey", "ShowPlayers", "ShowTeammates", "TeamColors",
+    "ESPEnabled", "ESPToggleKey", "ShowPlayers", "ShowTeammates", "ExcludedTeams", "TeamColors",
     "UseTeamColor", "FriendlyColor", "EnemyColor", "VisibilityCheck", "MaxDistance",
     "MinHealthEnabled", "MinHealthValue", "RefreshRate", "BoxEnabled", "BoxType",
     "BoxPadding", "BoxThickness", "BoxCornerLength", "BoxFill", "BoxOutline",
@@ -129,6 +129,11 @@ set("ShowTeammates", false)
 check(esplib.team.check == true, "ShowTeammates off enables team check")
 set("ShowTeammates", true)
 check(esplib.team.check == false, "ShowTeammates on disables team check")
+
+Fluent.Options.ExcludedTeams:SetValue({ ["Team Enemy"] = true })
+check(esplib.team.excluded["Team Enemy"] == true, "excluded teams reach esplib")
+Fluent.Options.ExcludedTeams:SetValue({})
+check(next(esplib.team.excluded) == nil, "excluded teams cleared")
 
 set("ESPEnabled", false)
 check(esplib.enabled == false, "master toggle reaches esplib")
@@ -238,6 +243,14 @@ step(1)
 check(near(enemy_data.box.fill.Color.R, 1), "team colours colour enemies red")
 local ally_data = getgenv().espinstances[ally_character]
 check(near(ally_data.box.fill.Color.G, 1), "team colours colour teammates green")
+
+-- excluded teams survive to the render loop
+Fluent.Options.ExcludedTeams:SetValue({ ["Team Enemy"] = true })
+step(1)
+check(enemy_data.box.outline.Visible == false, "excluded team is hidden in the render loop")
+Fluent.Options.ExcludedTeams:SetValue({})
+step(1)
+check(enemy_data.box.outline.Visible == true, "cleared exclusion restores the render")
 
 -- team check hides teammates
 set("ShowTeammates", false)

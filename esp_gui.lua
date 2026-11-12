@@ -47,10 +47,10 @@ local SaveManager = load_module(SAVE_MANAGER_URL)
 local InterfaceManager = load_module(INTERFACE_MANAGER_URL)
 local esplib = load_module(ESP_LIB_URL)
 
-if esplib.api ~= 2 then
+if esplib.api ~= 3 then
     error(
-        "esp_gui: esp_lib.lua is out of date (missing api 2 options such as team, filters, "
-            .. "head_dot and crosshair). Update the library at "
+        "esp_gui: esp_lib.lua is out of date (missing api 3 options such as team exclusion, "
+            .. "filters, head_dot and crosshair). Update the library at "
             .. ESP_LIB_URL,
         0
     )
@@ -58,6 +58,7 @@ end
 
 -- // services
 local Players = game:GetService("Players")
+local TeamsService = game:GetService("Teams")
 local LocalPlayer = Players.LocalPlayer
 
 -- // window
@@ -168,6 +169,8 @@ end
 
 -- // targets
 local esp_targets = {} -- instance -> { player = Player?, label = string }
+local team_dropdown
+local refresh_team_dropdown
 local player_connections = {}
 local custom_targets = {}
 local show_players = true
@@ -359,6 +362,32 @@ local function remove_custom_target(name)
     end
 end
 
+-- // teams
+local function team_names()
+    local names = {}
+    for _, team in ipairs(TeamsService:GetTeams()) do
+        if team and team.Name then
+            names[team.Name] = true
+        end
+    end
+    for _, player in ipairs(Players:GetPlayers()) do
+        local team = player.Team
+        if team and team.Name then
+            names[team.Name] = true
+        end
+    end
+    for name in pairs(esplib.team.excluded) do
+        names[name] = true
+    end
+
+    local list = {}
+    for name in pairs(names) do
+        list[#list + 1] = name
+    end
+    table.sort(list)
+    return list
+end
+
 local function custom_target_list()
     local names = {}
     for name in pairs(custom_targets) do
@@ -417,6 +446,8 @@ local function resync()
             end
         end
     end
+
+    refresh_team_dropdown()
 end
 
 -- // main tab
@@ -472,6 +503,69 @@ add_control(player_group, {
         esplib.team.check = not value
     end,
 })
+
+local refreshing_teams = false
+local last_team_signature
+
+refresh_team_dropdown = function(force)
+    if refreshing_teams or not team_dropdown then
+        return
+    end
+
+    local names = team_names()
+    local selected = {}
+    local selected_names = {}
+    for name in pairs(esplib.team.excluded) do
+        selected[name] = true
+        selected_names[#selected_names + 1] = name
+    end
+    table.sort(selected_names)
+
+    local signature = table.concat(names, "\0") .. "|" .. table.concat(selected_names, "\0")
+    if not force and signature == last_team_signature then
+        return
+    end
+    last_team_signature = signature
+
+    refreshing_teams = true
+    team_dropdown:SetValues(names)
+    team_dropdown:SetValue(selected)
+    refreshing_teams = false
+end
+
+team_dropdown = player_group:AddDropdown("ExcludedTeams", {
+    Title = "Excluded teams",
+    Description = "Players on these teams are never drawn",
+    Values = team_names(),
+    Multi = true,
+    Default = (function()
+        local selected = {}
+        for name in pairs(esplib.team.excluded) do
+            selected[name] = true
+        end
+        return selected
+    end)(),
+    Callback = function(values)
+        if type(values) ~= "table" then
+            return
+        end
+        local excluded = {}
+        for name, is_selected in pairs(values) do
+            if is_selected then
+                excluded[name] = true
+            end
+        end
+        esplib.team.excluded = excluded
+        refresh_team_dropdown()
+    end,
+})
+
+for _, signal_name in ipairs({ "ChildAdded", "ChildRemoved" }) do
+    local signal = TeamsService[signal_name]
+    if signal then
+        signal:Connect(refresh_team_dropdown)
+    end
+end
 
 add_control(player_group, {
     kind = "toggle",
@@ -1486,6 +1580,7 @@ Tabs.Settings:AddButton({
     Callback = function()
         esplib.reset()
         sync_controls()
+        refresh_team_dropdown(true)
         Fluent:Notify({
             Title = "Settings",
             Content = "Library options restored",

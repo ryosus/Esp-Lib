@@ -605,7 +605,20 @@ local HttpService = {
     end,
 }
 
+local Teams = {
+    ChildAdded = signal(),
+    ChildRemoved = signal(),
+}
+
+function Teams:GetTeams()
+    return {
+        { Name = "Team Ally" },
+        { Name = "Team Enemy" },
+    }
+end
+
 local SERVICES = {
+    Teams = Teams,
     RunService = RunService,
     Players = Players,
     UserInputService = UserInputService,

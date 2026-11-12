@@ -63,7 +63,7 @@ check(type(ESP.reset) == "function", "reset exists")
 check(ESP.box.type == "normal", "default box type")
 check(ESP.tracer.from == "mouse", "default tracer origin")
 check(ESP.enabled == true, "enabled by default")
-check(ESP.api == 2, "api marker exposed for the interface")
+check(ESP.api == 3, "api marker exposed for the interface")
 check(getmetatable(ESP.box.fill) ~= nil, "config keeps a real Color3 after load")
 check(getmetatable(ESP.team.friendly) ~= nil, "nested config keeps a real Color3 after load")
 check(getmetatable(ESP.tracer.origin) ~= nil, "config keeps a real Vector2 after load")
@@ -188,6 +188,15 @@ M.enemy.Neutral = false
 M.local_player.Neutral = false
 step(1)
 ESP.team.check = false
+
+-- 6b. excluded teams -------------------------------------------------------
+ESP.team.excluded = { ["Team Enemy"] = true }
+step(1)
+check(data.box.outline.Visible == false, "players on an excluded team are hidden")
+check(ally_data.box.outline.Visible == true, "players on other teams are unaffected")
+ESP.team.excluded = {}
+step(1)
+check(data.box.outline.Visible == true, "clearing the exclusion restores the players")
 
 -- 7. team colors ------------------------------------------------------------
 ESP.team.colors = true
@@ -547,6 +556,9 @@ if legacy_ok then
     ESP.reset()
     check(ESP.box.type == "normal", "reset restores box type")
     check(ESP.dynamic_text.size == 13, "reset restores text size")
+    ESP.team.excluded = { ["Team Enemy"] = true }
+    ESP.reset()
+    check(next(ESP.team.excluded) == nil, "reset clears the excluded teams")
     check(getmetatable(ESP.box.fill) ~= nil, "reset keeps a real Color3")
     check(getmetatable(ESP.tracer.origin) ~= nil, "reset keeps a real Vector2")
 end

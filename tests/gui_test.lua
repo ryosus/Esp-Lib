@@ -96,7 +96,8 @@ check(instances[ally_respawn] ~= nil, "players toggle restores respawned charact
 -- // every control exists --------------------------------------------------
 local expected = {
     "ESPEnabled", "ESPToggleKey",
-    "ShowPlayers", "ShowTeammates", "TeamColors", "UseTeamColor", "FriendlyColor", "EnemyColor",
+    "ShowPlayers", "ShowTeammates", "ExcludedTeams", "TeamColors", "UseTeamColor",
+    "FriendlyColor", "EnemyColor",
     "VisibilityCheck", "MaxDistance", "MinHealthEnabled", "MinHealthValue", "RefreshRate",
     "BoxEnabled", "BoxType", "BoxPadding", "BoxThickness", "BoxCornerLength", "BoxFill", "BoxOutline",
     "HealthbarEnabled", "HealthbarWidth", "HealthbarFill", "HealthbarOutline",
@@ -155,6 +156,17 @@ for _, case in ipairs(toggle_cases) do
     check(getter() == value, string.format("%s -> %s", name, tostring(value)))
     set_value(name, value == false)
 end
+
+-- excluded teams
+UI.elements.ExcludedTeams:SetValue({ ["Team Enemy"] = true })
+check(ESP.team.excluded["Team Enemy"] == true, "excluded teams dropdown reaches esplib")
+MOCK.render()
+check(instances[enemy_character].box.outline.Visible == false, "excluded team is not drawn")
+check(instances[ally_respawn].box.outline.Visible == true, "other teams are still drawn")
+UI.elements.ExcludedTeams:SetValue({})
+check(next(ESP.team.excluded) == nil, "clearing the excluded teams")
+MOCK.render()
+check(instances[enemy_character].box.outline.Visible == true, "excluded team restored")
 
 -- inverted toggle
 set_value("ShowTeammates", false)
@@ -297,6 +309,7 @@ UI.buttons["Reset settings"]:Click()
 check(near(ESP.box.padding, 1.15), "reset restores library defaults")
 check(UI.elements.BoxPadding.Value == 1.15, "reset syncs the padding slider")
 check(UI.elements.TextSize.Value == 13, "reset syncs the text size slider")
+check(next(ESP.team.excluded) == nil, "reset clears the excluded teams")
 
 -- // keybind ---------------------------------------------------------------
 check(ESP.enabled == true, "esp enabled before keybind test")

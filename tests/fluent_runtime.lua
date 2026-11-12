@@ -792,8 +792,8 @@ local function new_player(name, team_color)
     local player = Instance.new("Player")
     player.Name = name
     player.Neutral = false
-    player.TeamColor = brick_color(name .. "Team", team_color)
-    player.Team = { Name = name .. "Team", TeamColor = player.TeamColor }
+    player.TeamColor = brick_color("Team " .. name, team_color)
+    player.Team = { Name = "Team " .. name, TeamColor = player.TeamColor }
     player.Character = nil
     player.CharacterAdded = new_signal("CharacterAdded")
     player.CharacterRemoving = new_signal("CharacterRemoving")
@@ -818,7 +818,20 @@ function Players:GetPlayerFromCharacter(model) return player_characters[model] e
 function Players:GetPlayerByUserId() return nil end
 function Players:GetPlayerFromUserId() return nil end
 
+local Teams = {
+    ChildAdded = new_signal("Teams.ChildAdded"),
+    ChildRemoved = new_signal("Teams.ChildRemoved"),
+}
+
+function Teams:GetTeams()
+    return {
+        { Name = "Team Ally" },
+        { Name = "Team Enemy" },
+    }
+end
+
 local SERVICES = {
+    Teams = Teams,
     RunService = RunService,
     UserInputService = UserInputService,
     TweenService = TweenService,
