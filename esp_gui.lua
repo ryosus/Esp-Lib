@@ -1162,18 +1162,6 @@ add_control(skeleton_group, {
 })
 
 add_control(skeleton_group, {
-    kind = "color",
-    name = "SkeletonHeadColor",
-    title = "Head circle colour",
-    get = function()
-        return esplib.skeleton.head
-    end,
-    set = function(value)
-        esplib.skeleton.head = value
-    end,
-})
-
-add_control(skeleton_group, {
     kind = "slider",
     name = "SkeletonThickness",
     title = "Thickness",
@@ -1185,19 +1173,6 @@ add_control(skeleton_group, {
     end,
     set = function(value)
         esplib.skeleton.thickness = value
-    end,
-})
-
-add_control(skeleton_group, {
-    kind = "toggle",
-    name = "SkeletonHeadCircle",
-    title = "Head circle",
-    description = "Circle around the head as part of the skeleton",
-    get = function()
-        return esplib.skeleton.head_circle
-    end,
-    set = function(value)
-        esplib.skeleton.head_circle = value
     end,
 })
 

@@ -70,10 +70,8 @@ local defaults = {
     },
     skeleton = {
         enabled = true,
-        head = Color3.new(1, 0, 0),
         color = Color3.new(1, 1, 1),
         thickness = 2,
-        head_circle = true,
     },
     head_dot = {
         enabled = false,
@@ -558,17 +556,9 @@ function espfunctions.add_skeleton(instance)
         table.insert(lines, line)
     end
 
-    local head_circle = Drawing.new("Circle")
-    head_circle.Thickness = esplib.skeleton.thickness
-    head_circle.Filled = false
-    head_circle.Transparency = 1
-    head_circle.Visible = false
-    add_drawing(data, head_circle)
-
     data.skeleton = {
         bones = SKELETON_BONES,
         lines = lines,
-        head_circle = head_circle,
         parts = nil,
         parts_at = 0,
     }
@@ -1085,32 +1075,10 @@ local function render()
                         line.Visible = false
                     end
                 end
-
-                local head = instance:FindFirstChild("Head")
-                local head_circle = skeleton.head_circle
-                if skeleton_config.head_circle and head and head:IsA("BasePart") then
-                    local center, center_visible = camera:WorldToViewportPoint(head.Position)
-                    local offset = head.CFrame:PointToWorldSpace(Vector3.new(head.Size.X * 0.5, 0, 0))
-                    local edge, edge_visible = camera:WorldToViewportPoint(offset)
-                    if center_visible and edge_visible then
-                        local center_2d = Vector2.new(center.X, center.Y)
-                        local edge_2d = Vector2.new(edge.X, edge.Y)
-                        head_circle.Position = center_2d
-                        head_circle.Radius = math.max(1, (edge_2d - center_2d).Magnitude)
-                        head_circle.Color = accent or skeleton_config.head
-                        head_circle.Thickness = skeleton_config.thickness
-                        head_circle.Visible = true
-                    else
-                        head_circle.Visible = false
-                    end
-                else
-                    head_circle.Visible = false
-                end
             else
                 for i = 1, #skeleton.lines do
                     skeleton.lines[i].Visible = false
                 end
-                skeleton.head_circle.Visible = false
             end
         end
 

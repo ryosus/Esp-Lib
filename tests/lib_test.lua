@@ -82,7 +82,7 @@ local instances = getgenv().espinstances
 local data = instances[enemy_character]
 check(data ~= nil, "record created")
 check(#data.skeleton.lines == 21, "skeleton covers R15 and R6 bones")
-check(#data.drawings == 18 + 3 + 1 + 1 + 2 + 22 + 1, "drawing count matches modules")
+check(#data.drawings == 18 + 3 + 1 + 1 + 2 + 21 + 1, "drawing count matches modules")
 
 step(1)
 
@@ -98,6 +98,22 @@ check(data.tracer.fill.Visible == true, "tracer visible")
 check(data.tracer.fill.From.X == 640 and data.tracer.fill.From.Y == 300, "tracer starts at the mouse by default")
 check(data.head_dot.Visible == false, "head dot hidden by default")
 
+ESP.head_dot.enabled = true
+step(1)
+check(data.head_dot.Visible == true, "head dot visible when enabled")
+check(data.head_dot.Radius > 0, "head dot has a radius")
+check(data.head_dot.Color ~= nil, "head dot has a colour")
+
+ESP.head_dot.filled = false
+ESP.head_dot.size = 2
+step(1)
+check(data.head_dot.Filled == false, "head dot honours the filled option")
+ESP.head_dot.filled = true
+ESP.head_dot.size = 1
+ESP.head_dot.enabled = false
+step(1)
+check(data.head_dot.Visible == false, "head dot hides when disabled")
+
 local visible_bones = 0
 for _, line in ipairs(data.skeleton.lines) do
     if line.Visible then
@@ -105,7 +121,7 @@ for _, line in ipairs(data.skeleton.lines) do
     end
 end
 check(visible_bones > 0, "skeleton draws bones")
-check(data.skeleton.head_circle.Visible == true, "skeleton head circle visible")
+check(data.skeleton.head_circle == nil, "skeleton has no head circle")
 
 check(data.healthbar.text.Visible == false, "health text hidden by default")
 
@@ -114,7 +130,13 @@ ESP.enabled = false
 step(1)
 check(data.box.outline.Visible == false, "master switch hides box")
 check(data.distance.Visible == false, "master switch hides distance")
-check(data.skeleton.head_circle.Visible == false, "master switch hides head circle")
+local hidden_bones = true
+for _, line in ipairs(data.skeleton.lines) do
+    if line.Visible then
+        hidden_bones = false
+    end
+end
+check(hidden_bones, "master switch hides skeleton bones")
 ESP.enabled = true
 step(1)
 check(data.box.outline.Visible == true, "master switch restores box")
