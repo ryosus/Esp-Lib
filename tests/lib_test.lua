@@ -64,6 +64,10 @@ check(ESP.box.type == "normal", "default box type")
 check(ESP.tracer.from == "mouse", "default tracer origin")
 check(ESP.enabled == true, "enabled by default")
 check(ESP.api == 2, "api marker exposed for the interface")
+check(getmetatable(ESP.box.fill) ~= nil, "config keeps a real Color3 after load")
+check(getmetatable(ESP.team.friendly) ~= nil, "nested config keeps a real Color3 after load")
+check(getmetatable(ESP.tracer.origin) ~= nil, "config keeps a real Vector2 after load")
+check(getmetatable(ESP.defaults.box.fill) ~= nil, "defaults snapshot keeps a real Color3")
 
 -- 2. every module renders ---------------------------------------------------
 ESP.add_box(enemy_character)
@@ -501,6 +505,8 @@ if legacy_ok then
     ESP.reset()
     check(ESP.box.type == "normal", "reset restores box type")
     check(ESP.dynamic_text.size == 13, "reset restores text size")
+    check(getmetatable(ESP.box.fill) ~= nil, "reset keeps a real Color3")
+    check(getmetatable(ESP.tracer.origin) ~= nil, "reset keeps a real Vector2")
 end
 
 -- 24. frame cost sanity ----------------------------------------------------

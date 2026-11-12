@@ -17,6 +17,14 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
+CACHE = ROOT / ".scratch" / "cache"
+FLUENT_TAG = "1.1.0"
+FLUENT_FILES_URL = "https://api.github.com/repos/dawid-scripts/Fluent/git/trees/{tag}?recursive=1"
+FLUENT_RAW_URL = "https://raw.githubusercontent.com/dawid-scripts/Fluent/{tag}/{path}"
+ADDONS = {
+    "save_manager.lua": "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua",
+    "interface_manager.lua": "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua",
+}
 
 
 def find_tool(name: str) -> str:
@@ -119,6 +127,104 @@ end
     return path
 
 
+def download(url: str, target: pathlib.Path) -> None:
+    if target.exists():
+        return
+    import urllib.request
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(urllib.request.urlopen(url, timeout=30).read())
+
+
+def fetch_fluent_sources():
+    """Real Fluent sources the ui is built against, or None when offline."""
+    try:
+        import json
+        import urllib.request
+
+        tree_file = CACHE / f"fluent-{FLUENT_TAG}" / "tree.json"
+        if not tree_file.exists():
+            download(FLUENT_FILES_URL.format(tag=FLUENT_TAG), tree_file)
+        tree = json.loads(tree_file.read_text(encoding="utf-8"))
+        paths = [
+            entry["path"]
+            for entry in tree["tree"]
+            if entry["path"].startswith("src/") and entry["path"].endswith(".lua")
+        ]
+
+        files = {}
+        for path in paths:
+            target = CACHE / f"fluent-{FLUENT_TAG}" / path
+            download(FLUENT_RAW_URL.format(tag=FLUENT_TAG, path=path), target)
+            key = path[len("src/"):-len(".lua")]
+            files[key] = target.read_text(encoding="utf-8")
+
+        addons = {}
+        for name, url in ADDONS.items():
+            target = CACHE / name
+            download(url, target)
+            addons[name] = target.read_text(encoding="utf-8")
+
+        return files, addons
+    except Exception as error:  # offline / rate limited
+        print(f"skipping real-fluent suite: {error}")
+        return None
+
+
+def build_real_harness(sources) -> pathlib.Path:
+    files, addons = sources
+    runtime = strip_return(read(TESTS / "fluent_runtime.lua"), "\nreturn RUNTIME\n")
+    loader = strip_return(read(TESTS / "fluent_loader.lua"), "\nreturn FLUENT_LIBRARY\n")
+
+    table = ["FLUENT_FILES = {}"]
+    for key in sorted(files):
+        source = files[key]
+        assert "]===]" not in source, key
+        table.append(f'FLUENT_FILES["{key}"] = [===[\n{source}\n]===]\n')
+    table.append("FLUENT_FOLDERS = {}")
+
+    # Fluent 1.1.0 force-enables acrylic and its blur needs a depth-of-field
+    # pipeline; the ui wiring under test is unaffected, so it is stubbed.
+    table.append(
+        'FLUENT_FILES["Acrylic/init"] = [===[\n'
+        "local Acrylic = {}\n"
+        "function Acrylic.init()\n"
+        "    function Acrylic.Enable() end\n"
+        "    function Acrylic.Disable() end\n"
+        "end\n"
+        "function Acrylic.Enable() end\n"
+        "function Acrylic.Disable() end\n"
+        "function Acrylic.CreateAcrylic() return Instance.new('Model') end\n"
+        "function Acrylic.AcrylicPaint()\n"
+        "    local frame = Instance.new('Frame')\n"
+        "    local background = Instance.new('Frame')\n"
+        "    background.Name = 'Background'\n"
+        "    background.BackgroundTransparency = 0\n"
+        "    background.Parent = frame\n"
+        "    return { Frame = frame, Background = background, Model = Instance.new('Model'),\n"
+        "        AddParent = function() end, Cleanup = function() end }\n"
+        "end\n"
+        "return Acrylic\n]===]\n"
+    )
+
+    harness = (
+        runtime
+        + "\n"
+        + "\n".join(table)
+        + "\n"
+        + loader
+        + "\n"
+        + embed("LIB_SOURCE", read(ROOT / "esp_lib.lua"))
+        + embed("GUI_SOURCE", read(ROOT / "esp_gui.lua"))
+        + embed("SAVE_SOURCE", addons["save_manager.lua"])
+        + embed("IFACE_SOURCE", addons["interface_manager.lua"])
+        + read(TESTS / "real_ui_test.lua")
+    )
+    path = TESTS / "_real_run.lua"
+    path.write_text(harness, encoding="utf-8")
+    return path
+
+
 def run(path: pathlib.Path) -> int:
     print(f"\n=== {path.name} ===")
     result = subprocess.run(
@@ -140,6 +246,11 @@ def main() -> int:
     exit_code = 0
     for path in (build_library_harness(), build_gui_harness()):
         exit_code |= run(path)
+
+    sources = fetch_fluent_sources()
+    if sources is not None:
+        exit_code |= run(build_real_harness(sources))
+
     return exit_code
 
 

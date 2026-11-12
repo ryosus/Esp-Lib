@@ -252,9 +252,9 @@ local DRAWING_PROPS = {
 
 local function type_matches(value, expected)
     if expected == "Vector2" then
-        return type(value) == "table" and value.X ~= nil and value.Y ~= nil
+        return type(value) == "table" and getmetatable(value) ~= nil and value.X ~= nil and value.Y ~= nil
     elseif expected == "Color3" then
-        return type(value) == "table" and value.R ~= nil
+        return type(value) == "table" and getmetatable(value) ~= nil and value.R ~= nil
     end
     return type(value) == expected
 end

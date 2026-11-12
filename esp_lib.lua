@@ -117,10 +117,25 @@ if type(esplib) ~= "table" then
     getgenv().esplib = esplib
 end
 
+-- Config values such as Color3 and Vector2 are tables with a metatable; only
+-- metatable-less tables are nested option groups. Cloning a Color3 into a plain
+-- table breaks every Drawing call, so value types are always assigned by
+-- reference.
+local function is_config_table(value)
+    return type(value) == "table" and getmetatable(value) == nil
+end
+
+local function value_type(value)
+    if typeof then
+        return typeof(value)
+    end
+    return type(value)
+end
+
 local function copy_config(source, target)
     for key, value in pairs(source) do
-        if type(value) == "table" then
-            if type(target[key]) ~= "table" then
+        if is_config_table(value) then
+            if not is_config_table(target[key]) then
                 target[key] = {}
             end
             copy_config(value, target[key])
@@ -130,20 +145,21 @@ local function copy_config(source, target)
     end
 end
 
-local function fill_missing(target, source)
+local function merge_config(target, source)
     for key, value in pairs(source) do
-        if type(value) == "table" then
-            if type(target[key]) ~= "table" then
+        if is_config_table(value) then
+            if not is_config_table(target[key]) then
                 target[key] = {}
             end
-            fill_missing(target[key], value)
-        elseif target[key] == nil then
+            merge_config(target[key], value)
+        elseif value_type(target[key]) ~= value_type(value) then
+            -- missing or corrupted option (a stale table where a Color3 belongs)
             target[key] = value
         end
     end
 end
 
-fill_missing(esplib, defaults)
+merge_config(esplib, defaults)
 if type(esplib.defaults) ~= "table" then
     esplib.defaults = {}
 end

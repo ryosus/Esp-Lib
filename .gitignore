@@ -2,3 +2,4 @@ test.lua
 tests/_lib_run.lua
 tests/_gui_run.lua
 .scratch/
+tests/_real_run.lua

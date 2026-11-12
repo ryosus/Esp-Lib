@@ -1498,6 +1498,10 @@ SaveManager:SetIgnoreIndexes({})
 InterfaceManager:SetFolder(CONFIG_FOLDER)
 SaveManager:SetFolder(CONFIG_FOLDER)
 
+-- Fluent 1.1.0 force-enables acrylic; default it off, the Settings tab can
+-- still turn the blur back on.
+InterfaceManager.Settings.Acrylic = false
+
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 SaveManager:BuildConfigSection(Tabs.Settings)
 
