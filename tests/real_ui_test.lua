@@ -78,7 +78,7 @@ check(Fluent ~= nil, "fluent module captured")
 check(Fluent.Version == "1.1.0", "real Fluent 1.1.0 loaded, got " .. tostring(Fluent and Fluent.Version))
 check(Fluent.Window ~= nil, "window created")
 check(getgenv().esplib == esplib, "esplib shared through getgenv")
-check(esplib.api == 3, "library api 3")
+check(esplib.api == 4, "library api 4")
 check(Fluent.UseAcrylic ~= nil, "acrylic flag present")
 check(Fluent.Acrylic == false, "blur disabled through ToggleAcrylic")
 
@@ -96,7 +96,7 @@ local expected = {
     "TracerFill", "TracerOutline", "TracerThickness", "TracerOutlineThickness",
     "SkeletonEnabled", "SkeletonColor", "SkeletonThickness",
     "HeadDotEnabled", "HeadDotFilled", "HeadDotSize",
-    "HeadDotThickness", "HeadDotColor", "Rainbow", "RainbowSpeed", "CrosshairEnabled",
+    "HeadDotThickness", "HeadDotColor", "OutlinesEnabled", "Rainbow", "RainbowSpeed", "CrosshairEnabled",
     "CrosshairSize", "CrosshairGap", "CrosshairThickness", "CrosshairOutlineThickness",
     "CrosshairColor", "CrosshairOutline", "CustomTargetName", "CustomTargetList",
 }
@@ -146,6 +146,10 @@ set("BoxEnabled", true)
 set("NamesEnabled", false)
 check(esplib.dynamic_text.enabled == false, "names toggle reaches esplib")
 set("NamesEnabled", true)
+
+set("OutlinesEnabled", false)
+check(esplib.outlines == false, "outlines toggle reaches esplib")
+set("OutlinesEnabled", true)
 
 set("Rainbow", true)
 check(esplib.rainbow == true, "rainbow toggle reaches esplib")
@@ -271,6 +275,16 @@ step(1)
 check(enemy_data.box.outline.Visible == true, "visibility check shows clear targets")
 check(enemy_data.texts.name.Visible == true, "visibility check restores clear names")
 set("VisibilityCheck", false)
+
+-- outlines through the real toggle
+set("OutlinesEnabled", false)
+step(1)
+check(enemy_data.box.outline.Visible == false, "outlines off hides the box outline")
+check(enemy_data.box.fill.Visible == true, "outlines off keeps the box line")
+check(enemy_data.tracer.outline.Visible == false, "outlines off hides the tracer outline")
+set("OutlinesEnabled", true)
+step(1)
+check(enemy_data.box.outline.Visible == true, "outlines on restores the box outline")
 
 -- box type through the real dropdown
 set("BoxType", "Corner")

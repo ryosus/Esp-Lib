@@ -47,10 +47,10 @@ local SaveManager = load_module(SAVE_MANAGER_URL)
 local InterfaceManager = load_module(INTERFACE_MANAGER_URL)
 local esplib = load_module(ESP_LIB_URL)
 
-if esplib.api ~= 3 then
+if esplib.api ~= 4 then
     error(
-        "esp_gui: esp_lib.lua is out of date (missing api 3 options such as team exclusion, "
-            .. "filters, head_dot and crosshair). Update the library at "
+        "esp_gui: esp_lib.lua is out of date (missing api 4 options such as the outline "
+            .. "switch, team exclusion, filters and crosshair). Update the library at "
             .. ESP_LIB_URL,
         0
     )
@@ -1341,6 +1341,21 @@ add_control(dot_group, {
 })
 
 -- // misc tab
+local outline_group = Tabs.Misc:AddSection("Outlines")
+
+add_control(outline_group, {
+    kind = "toggle",
+    name = "OutlinesEnabled",
+    title = "Outlines",
+    description = "Dark outline behind boxes, health bars, tracers, crosshair and text",
+    get = function()
+        return esplib.outlines
+    end,
+    set = function(value)
+        esplib.outlines = value
+    end,
+})
+
 local accent_group = Tabs.Misc:AddSection("Accents")
 
 add_control(accent_group, {

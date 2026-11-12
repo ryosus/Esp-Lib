@@ -63,7 +63,8 @@ check(type(ESP.reset) == "function", "reset exists")
 check(ESP.box.type == "normal", "default box type")
 check(ESP.tracer.from == "mouse", "default tracer origin")
 check(ESP.enabled == true, "enabled by default")
-check(ESP.api == 3, "api marker exposed for the interface")
+check(ESP.api == 4, "api marker exposed for the interface")
+check(ESP.outlines == true, "outlines enabled by default")
 check(getmetatable(ESP.box.fill) ~= nil, "config keeps a real Color3 after load")
 check(getmetatable(ESP.team.friendly) ~= nil, "nested config keeps a real Color3 after load")
 check(getmetatable(ESP.tracer.origin) ~= nil, "config keeps a real Vector2 after load")
@@ -413,6 +414,31 @@ ESP.add_box(empty_tool)
 step(1)
 check(instances[empty_tool].box.outline.Visible == false, "targets without parts stay hidden")
 
+-- 16b. outlines toggle -----------------------------------------------------
+ESP.dynamic_text.outline = true
+ESP.distance.outline = true
+ESP.outlines = false
+step(1)
+check(data.box.outline.Visible == false, "outlines off hides the box outline")
+check(data.box.fill.Visible == true, "outlines off keeps the box line")
+check(data.healthbar.outline.Visible == false, "outlines off hides the health bar backing")
+check(data.healthbar.fill.Visible == true, "outlines off keeps the health bar")
+check(data.tracer.outline.Visible == false, "outlines off hides the tracer outline")
+check(data.tracer.fill.Visible == true, "outlines off keeps the tracer")
+check(data.texts.name.Outline == false, "outlines off hides name outlines")
+check(data.distance.Outline == false, "outlines off hides distance outlines")
+
+ESP.box.type = "corner"
+step(1)
+check(data.box.corner_outline[1].Visible == false, "outlines off hides corner outlines")
+check(data.box.corner_fill[1].Visible == true, "outlines off keeps corner lines")
+ESP.box.type = "normal"
+
+ESP.outlines = true
+step(1)
+check(data.box.outline.Visible == true, "outlines on restores the box outline")
+check(data.texts.name.Outline == true, "outlines on restores text outlines")
+
 -- 17. prune destroyed instances --------------------------------------------
 local doomed = M.character("Doomed", M.Vector3.new(0, 0, -60))
 M.workspace:AddChild(doomed)
@@ -444,21 +470,32 @@ ESP.enabled = true
 step(1)
 
 -- 19. crosshair ------------------------------------------------------------
+local function count_center_lines()
+    local limit = 20
+    local count = 0
+    for _, drawing in ipairs(MOCK.drawings) do
+        if drawing.Type == "Line" and not drawing.Removed and drawing.Visible
+            and drawing.From and drawing.To
+            and math.abs(drawing.From.X - viewport.X / 2) <= limit
+            and math.abs(drawing.From.Y - viewport.Y / 2) <= limit
+            and math.abs(drawing.To.X - viewport.X / 2) <= limit
+            and math.abs(drawing.To.Y - viewport.Y / 2) <= limit then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 ESP.crosshair.enabled = true
 step(1)
-local crosshair_drawings = 0
-local limit = 20
-for _, drawing in ipairs(MOCK.drawings) do
-    if drawing.Type == "Line" and not drawing.Removed and drawing.Visible
-        and drawing.From and drawing.To
-        and math.abs(drawing.From.X - viewport.X / 2) <= limit
-        and math.abs(drawing.From.Y - viewport.Y / 2) <= limit
-        and math.abs(drawing.To.X - viewport.X / 2) <= limit
-        and math.abs(drawing.To.Y - viewport.Y / 2) <= limit then
-        crosshair_drawings = crosshair_drawings + 1
-    end
-end
-check(crosshair_drawings == 8, "crosshair draws four filled and four outline segments")
+check(count_center_lines() == 8, "crosshair draws four filled and four outline segments")
+
+ESP.outlines = false
+step(1)
+check(count_center_lines() == 4, "outlines off hides the crosshair outlines")
+ESP.outlines = true
+step(1)
+check(count_center_lines() == 8, "outlines on restores the crosshair outlines")
 
 ESP.crosshair.enabled = false
 step(1)

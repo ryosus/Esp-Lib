@@ -108,7 +108,7 @@ local expected = {
     "TracerFill", "TracerOutline", "TracerThickness", "TracerOutlineThickness",
     "SkeletonEnabled", "SkeletonColor", "SkeletonThickness",
     "HeadDotEnabled", "HeadDotFilled", "HeadDotSize", "HeadDotThickness", "HeadDotColor",
-    "Rainbow", "RainbowSpeed",
+    "OutlinesEnabled", "Rainbow", "RainbowSpeed",
     "CrosshairEnabled", "CrosshairSize", "CrosshairGap", "CrosshairThickness",
     "CrosshairOutlineThickness", "CrosshairColor", "CrosshairOutline",
     "CustomTargetName", "CustomTargetList",
@@ -146,6 +146,7 @@ local toggle_cases = {
     { "SkeletonEnabled", false, function() return ESP.skeleton.enabled end },
     { "HeadDotEnabled", true, function() return ESP.head_dot.enabled end },
     { "HeadDotFilled", false, function() return ESP.head_dot.filled end },
+    { "OutlinesEnabled", false, function() return ESP.outlines end },
     { "Rainbow", true, function() return ESP.rainbow end },
     { "CrosshairEnabled", true, function() return ESP.crosshair.enabled end },
 }

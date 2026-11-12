@@ -22,6 +22,7 @@ local local_player = players.LocalPlayer
 -- // defaults
 local defaults = {
     enabled = true, -- master switch
+    outlines = true, -- dark outline behind boxes, bars, tracers, crosshair and text
 
     box = {
         enabled = true,
@@ -654,7 +655,7 @@ local function get_crosshair()
     return crosshair
 end
 
-local function update_crosshair(config, viewport)
+local function update_crosshair(config, viewport, outlines)
     local enabled = config.enabled
     if not enabled and #crosshair == 0 then
         return
@@ -682,7 +683,7 @@ local function update_crosshair(config, viewport)
             entry.outline.To = center + direction * (gap + size + 1)
             entry.outline.Thickness = config.outline_thickness
             entry.outline.Color = config.outline
-            entry.outline.Visible = true
+            entry.outline.Visible = outlines
         else
             entry.fill.Visible = false
             entry.outline.Visible = false
@@ -706,7 +707,7 @@ local function render()
     local local_character = local_player and local_player.Character
 
     if config.crosshair.enabled or #crosshair > 0 then
-        update_crosshair(config.crosshair, viewport)
+        update_crosshair(config.crosshair, viewport, config.outlines)
     end
 
     if not config.enabled then
@@ -736,6 +737,7 @@ local function render()
     local excluded_teams = team_config.excluded
     local check_teams = team_config.check or team_config.colors or next(excluded_teams) ~= nil
     local rainbow = config.rainbow
+    local outlines = config.outlines
 
     local ray_filter = { camera }
     if local_character then
@@ -877,7 +879,7 @@ local function render()
                         outline_line.To = oTo
                         outline_line.Thickness = box_config.thickness
                         outline_line.Color = outline_color
-                        outline_line.Visible = true
+                        outline_line.Visible = outlines
 
                         local fill_line = fill_lines[i]
                         fill_line.From = from
@@ -891,7 +893,7 @@ local function render()
                 else
                     box.outline.Position = min
                     box.outline.Size = max - min
-                    box.outline.Visible = true
+                    box.outline.Visible = outlines
 
                     box.fill.Position = min
                     box.fill.Size = max - min
@@ -932,7 +934,7 @@ local function render()
                 outline.Color = healthbar_config.outline
                 outline.Position = Vector2.new(x, y)
                 outline.Size = Vector2.new(bar_width + 2 * padding, height + 2 * padding)
-                outline.Visible = true
+                outline.Visible = outlines
 
                 fill.Color = healthbar_config.fill
                 fill.Position = Vector2.new(x + padding, y + padding + height - fill_height)
@@ -957,7 +959,7 @@ local function render()
                 health_text.Text = data.health_string
                 health_text.Size = health_text_config.size
                 health_text.Color = health_text_config.fill
-                health_text.Outline = text_config.outline
+                health_text.Outline = text_config.outline and outlines
                 health_text.Position = Vector2.new(
                     center_x,
                     max.Y + 3 + (distance_config.enabled and (distance_config.size + 1) or 0)
@@ -976,7 +978,7 @@ local function render()
                 if text_config.enabled and onscreen and not blocked then
                     drawing.Size = text_config.size
                     drawing.Color = accent or text_config.fill
-                    drawing.Outline = text_config.outline
+                    drawing.Outline = text_config.outline and outlines
                     drawing.Position = Vector2.new(center_x, y - index * (text_config.size + text_config.line_spacing))
                     drawing.Visible = true
                     index = index + 1
@@ -996,7 +998,7 @@ local function render()
                 end
                 drawing.Size = distance_config.size
                 drawing.Color = accent or distance_config.fill
-                drawing.Outline = distance_config.outline
+                drawing.Outline = distance_config.outline and outlines
                 drawing.Position = Vector2.new(center_x, max.Y + 3)
                 drawing.Visible = true
             else
@@ -1054,7 +1056,7 @@ local function render()
                 tracer.outline.To = to
                 tracer.outline.Thickness = tracer_config.outline_thickness
                 tracer.outline.Color = tracer_config.outline
-                tracer.outline.Visible = true
+                tracer.outline.Visible = outlines
 
                 tracer.fill.From = from
                 tracer.fill.To = to
@@ -1173,7 +1175,7 @@ for name, fn in pairs(espfunctions) do
     esplib[name] = fn
 end
 
-esplib.api = 3
+esplib.api = 4
 
 if getgenv().esplib_connection then
     getgenv().esplib_connection:Disconnect()
