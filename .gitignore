@@ -1,1 +1,4 @@
 test.lua
+tests/_lib_run.lua
+tests/_gui_run.lua
+.scratch/
